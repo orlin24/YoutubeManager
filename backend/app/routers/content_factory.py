@@ -92,6 +92,8 @@ def _brief_payload(brief: object) -> dict:
         concept, variants = "", []
     outline = brief.script_outline or {}
     keywords = brief.seo_keywords or []
+    if isinstance(keywords, dict):  # data lama: {"keywords": [...]}
+        keywords = keywords.get("keywords") or []
     if not isinstance(keywords, list):
         keywords = []
     return {

@@ -34,6 +34,12 @@ AGENTS: dict[str, dict] = {
         "description": "Content plans, ideas, schedules.",
         "tools": ["get_channel_info", "get_channel_analytics", "create_video_draft", "create_content_plan"],
     },
+    "content_factory": {
+        "name": "Content Factory",
+        "system_prompt_file": "content_factory.txt",
+        "description": "Content Factory pipeline: ideas, briefs, titles, thumbnails, scripts, quality.",
+        "tools": [],
+    },
     "title_specialist": {
         "name": "Title Specialist",
         "system_prompt_file": "title_specialist.txt",

@@ -131,7 +131,7 @@ def generate_ideas(db: Session, channel: Channel, count: int = 6,
 
     mix = mix or CONTENT_MIX
     ctx = _winning_context(db, channel)
-    system = load_system_prompt("content_strategist")
+    system = load_system_prompt("content_factory")
     user = (
         "Buat rencana konten dari POLA TERBUKTI, bukan random.\n"
         f"KONTEKS CHANNEL:\n{json.dumps(ctx, ensure_ascii=False)}\n\n"
@@ -214,7 +214,7 @@ def generate_brief(db: Session, idea: ContentIdea, persist: bool = True) -> Cont
 
     channel = db.get(Channel, idea.channel_id)
     ctx = _winning_context(db, channel) if channel else {}
-    system = load_system_prompt("content_strategist")
+    system = load_system_prompt("content_factory")
     user = (
         f"Buat CONTENT BRIEF untuk ide berikut:\n{json.dumps({'topic': idea.topic, 'angle': idea.angle,
                                                              'format': idea.format, 'reason': idea.reason},
@@ -224,6 +224,13 @@ def generate_brief(db: Session, idea: ContentIdea, persist: bool = True) -> Cont
         "Respond strict JSON sesuai skema. Bahasa Indonesia."
     )
     data = _llm(db, idea.channel_id, "brief", system, user, _Brief)
+    raw_kw = data.get("seo_keywords") or []
+    # LLM kadang membungkus jadi {"keywords": [...]} - normalisasi ke list str
+    if isinstance(raw_kw, dict):
+        raw_kw = raw_kw.get("keywords") or raw_kw.get("list") or []
+    if not isinstance(raw_kw, list):
+        raw_kw = [raw_kw]
+    keywords = [str(k).strip() for k in raw_kw if str(k).strip()][:15]
     brief = ContentBrief(
         idea_id=idea.id,
         channel_id=idea.channel_id,
@@ -238,7 +245,7 @@ def generate_brief(db: Session, idea: ContentIdea, persist: bool = True) -> Cont
         cta=str(data.get("cta", "")).strip(),
         visual_direction=str(data.get("visual_direction", "")).strip(),
         thumbnail_concept=str(data.get("thumbnail_concept", "")).strip(),
-        seo_keywords={"keywords": data.get("seo_keywords") or []},
+        seo_keywords=keywords,
         production_notes=str(data.get("production_notes", "")).strip(),
         quality_requirements=str(data.get("quality_requirements", "")).strip(),
         risk_notes=str(data.get("risk_notes", "")).strip(),
@@ -287,7 +294,7 @@ def generate_title_variants(db: Session, brief: ContentBrief, persist: bool = Tr
         "score 0-100 (internal, clarity+curiosity+relevance+search intent). "
         "JANGAN clickbait menyesatkan. Respond strict JSON: {titles: [{title, strategy, reason, risk, score}]}"
     )
-    data = _llm(db, brief.channel_id, "title", load_system_prompt("title_specialist"), user, _Titles)
+    data = _llm(db, brief.channel_id, "title", load_system_prompt("content_factory"), user, _Titles)
     titles = [t for t in data.get("titles", []) if t.get("title")][:5]
     brief.title_variants = titles
     if persist:
@@ -322,7 +329,7 @@ def generate_thumbnail_strategy(db: Session, brief: ContentBrief, persist: bool 
         "masing-masing dengan image_prompt siap pakai. Respond strict JSON: "
         "{concept, variants: [{concept, subject, composition, emotion, background, text_suggestion, image_prompt}]}"
     )
-    data = _llm(db, brief.channel_id, "thumbnail", load_system_prompt("content_strategist"), user, _Resp)
+    data = _llm(db, brief.channel_id, "thumbnail", load_system_prompt("content_factory"), user, _Resp)
     variants = [v for v in data.get("variants", []) if v.get("image_prompt")][:3]
     brief.thumbnail_variants = {"concept": data.get("concept", ""), "variants": variants}
     if persist:
@@ -350,7 +357,7 @@ def generate_script_outline(db: Session, brief: ContentBrief, persist: bool = Tr
                        'cta': brief.cta}, ensure_ascii=False)}\n"
         "Respond strict JSON: {outline: {...}} sesuai niche. Bahasa Indonesia."
     )
-    data = _llm(db, brief.channel_id, "script", load_system_prompt("content_strategist"), user, _Resp)
+    data = _llm(db, brief.channel_id, "script", load_system_prompt("content_factory"), user, _Resp)
     brief.script_outline = data.get("outline") or {}
     if persist:
         db.commit()
@@ -406,7 +413,7 @@ def quality_check(db: Session, brief: ContentBrief, persist: bool = True) -> dic
             "Periksa: kejelasan, relevansi, kesesuaian audiens, risiko menyesatkan, repetisi. "
             "Respond strict JSON: {score, issues: []}"
         )
-        data = _llm(db, brief.channel_id, "quality", load_system_prompt("content_strategist"), user, _Q)
+        data = _llm(db, brief.channel_id, "quality", load_system_prompt("content_factory"), user, _Q)
         score = (score + int(data.get("score", 70))) // 2
         issues = list(dict.fromkeys(issues + data.get("issues", [])[:4]))
     except Exception:  # noqa: BLE001 - rule-based score stands
