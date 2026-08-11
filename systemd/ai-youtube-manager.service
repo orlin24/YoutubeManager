@@ -1,15 +1,17 @@
 [Unit]
 Description=AI YouTube Manager (FastAPI backend + SPA)
-After=network.target postgresql.service
-Wants=postgresql.service
+# Template: ganti __APP_DIR__ (mis. /opt/ai-youtube-manager) dan USER bila perlu.
+# Installer otomatis (scripts/install.sh) menulis unit final ke /etc/systemd/system.
+After=network.target
+Wants=network.target
 
 [Service]
 Type=simple
-User=www-data
-Group=www-data
+User=aym
+Group=aym
 WorkingDirectory=__APP_DIR__/backend
 EnvironmentFile=__APP_DIR__/backend/.env
-ExecStart=__APP_DIR__/backend/.venv/bin/gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 3 -b 127.0.0.1:5000 --timeout 120
+ExecStart=__APP_DIR__/backend/.venv/bin/gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 1 -b 0.0.0.0:5000 --timeout 120
 Restart=always
 RestartSec=5
 StandardOutput=journal
