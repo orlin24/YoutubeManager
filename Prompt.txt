@@ -1,0 +1,1922 @@
+# MASTER PROMPT — BUILD AI YOUTUBE EMPLOYEE / YOUTUBE MANAGER
+
+Anda adalah **Senior Full-Stack Engineer, DevOps Engineer, AI Agent Architect, dan YouTube API Specialist**.
+
+Tugas Anda adalah membangun sebuah aplikasi web production-ready bernama:
+
+# AI YOUTUBE MANAGER
+
+Aplikasi ini adalah **AI employee/asisten profesional untuk mengelola channel YouTube**, yang dapat diakses melalui browser dari VPS Ubuntu 22.04.
+
+Target akses awal:
+
+`http://IP-VPS:5000`
+
+Namun arsitektur harus siap dipasang di belakang Nginx + HTTPS + domain pada tahap berikutnya.
+
+---
+
+# 1. TUJUAN UTAMA
+
+Bangun aplikasi web yang memungkinkan pemilik channel YouTube:
+
+1. Login ke dashboard.
+2. Menghubungkan akun YouTube menggunakan Google OAuth 2.0.
+3. Mengelola beberapa channel YouTube.
+4. Melihat informasi channel.
+5. Melihat daftar video.
+6. Melihat analytics.
+7. Mengupload video.
+8. Mengubah metadata video.
+9. Mengelola playlist.
+10. Membaca komentar.
+11. Membuat content plan.
+12. Meminta AI menganalisis channel.
+13. Meminta AI membuat strategi konten.
+14. Meminta AI membuat judul.
+15. Meminta AI membuat deskripsi.
+16. Meminta AI membuat SEO keyword/tag.
+17. Meminta AI menganalisis performa video.
+18. Meminta AI memberikan rekomendasi optimasi.
+19. Menyimpan histori keputusan AI.
+20. Menyediakan approval system sebelum AI melakukan tindakan berisiko.
+21. Menyediakan audit log seluruh tindakan.
+22. Menyediakan dashboard multi-channel.
+
+Aplikasi harus dirancang sebagai **AI employee**, bukan chatbot sederhana.
+
+---
+
+# 2. PRINSIP PALING PENTING
+
+Jangan membuat mockup yang hanya terlihat bagus.
+
+Semua fitur utama harus benar-benar memiliki backend dan terhubung ke database/API.
+
+Jika ada fitur yang belum bisa benar-benar diimplementasikan karena credential/API belum tersedia, buat:
+
+* interface
+* service layer
+* database model
+* API endpoint
+* error handling
+* placeholder configuration
+
+Tetapi jangan membuat data palsu seolah-olah berasal dari YouTube.
+
+Gunakan environment variable untuk credential.
+
+Jangan pernah hard-code:
+
+* Google Client ID
+* Google Client Secret
+* YouTube token
+* AI API key
+* database password
+* JWT secret
+
+---
+
+# 3. TECH STACK
+
+Gunakan stack berikut.
+
+## Backend
+
+Python 3.11+
+
+FastAPI
+
+Uvicorn/Gunicorn
+
+SQLAlchemy
+
+Alembic
+
+Pydantic
+
+PostgreSQL
+
+Redis jika diperlukan
+
+HTTPX
+
+Google API Client
+
+OAuth 2.0
+
+JWT/session authentication
+
+## Frontend
+
+React
+
+TypeScript
+
+Vite
+
+Tailwind CSS
+
+Lucide Icons
+
+Recharts atau library chart modern
+
+Responsive design.
+
+## Deployment
+
+Ubuntu 22.04
+
+Nginx
+
+systemd
+
+Gunicorn/Uvicorn
+
+PostgreSQL
+
+Redis optional
+
+Docker optional, tetapi aplikasi harus tetap mudah dijalankan tanpa Docker.
+
+---
+
+# 4. STRUKTUR PROJECT
+
+Buat struktur yang bersih seperti:
+
+```text
+ai-youtube-manager/
+│
+├── backend/
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   │
+│   │   ├── models/
+│   │   ├── schemas/
+│   │   ├── routers/
+│   │   ├── services/
+│   │   ├── agents/
+│   │   ├── youtube/
+│   │   ├── analytics/
+│   │   ├── auth/
+│   │   ├── tasks/
+│   │   └── utils/
+│   │
+│   ├── alembic/
+│   ├── requirements.txt
+│   └── .env.example
+│
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── layouts/
+│   │   ├── hooks/
+│   │   ├── services/
+│   │   ├── types/
+│   │   └── utils/
+│   ├── package.json
+│   └── .env.example
+│
+├── nginx/
+│   └── ai-youtube-manager.conf
+│
+├── systemd/
+│   └── ai-youtube-manager.service
+│
+├── scripts/
+│   ├── install.sh
+│   ├── start.sh
+│   ├── stop.sh
+│   └── backup.sh
+│
+├── README.md
+├── docker-compose.yml
+└── .gitignore
+```
+
+Boleh memperbaiki struktur jika ada struktur yang lebih profesional.
+
+---
+
+# 5. DATABASE
+
+Gunakan PostgreSQL.
+
+Buat migration menggunakan Alembic.
+
+Minimal tabel:
+
+## users
+
+```text
+id
+email
+name
+password_hash / authentication reference
+created_at
+updated_at
+```
+
+## youtube_accounts
+
+```text
+id
+user_id
+google_account_email
+channel_id
+channel_title
+channel_description
+channel_thumbnail
+access_token_encrypted
+refresh_token_encrypted
+token_expiry
+created_at
+updated_at
+```
+
+## channels
+
+```text
+id
+youtube_account_id
+channel_id
+title
+description
+thumbnail_url
+subscriber_count
+view_count
+video_count
+created_at
+updated_at
+```
+
+## videos
+
+```text
+id
+channel_id
+youtube_video_id
+title
+description
+published_at
+duration
+view_count
+like_count
+comment_count
+privacy_status
+created_at
+updated_at
+```
+
+## analytics_snapshots
+
+```text
+id
+channel_id
+video_id nullable
+date
+views
+watch_time
+average_view_duration
+likes
+comments
+shares
+subscribers_gained
+subscribers_lost
+estimated_revenue
+created_at
+```
+
+## ai_tasks
+
+```text
+id
+channel_id
+task_type
+instruction
+status
+priority
+result
+created_at
+completed_at
+```
+
+## ai_decisions
+
+```text
+id
+channel_id
+task_id
+decision_type
+reasoning_summary
+recommendation
+confidence
+created_at
+```
+
+JANGAN menyimpan private chain-of-thought.
+
+Simpan hanya:
+
+* decision summary
+* recommendation
+* evidence
+* confidence
+* action
+
+## approval_requests
+
+```text
+id
+channel_id
+action_type
+target_id
+proposed_change
+reason
+risk_level
+status
+created_at
+approved_at
+```
+
+## audit_logs
+
+```text
+id
+user_id
+channel_id
+action
+target
+result
+metadata
+created_at
+```
+
+---
+
+# 6. GOOGLE / YOUTUBE OAUTH
+
+Implementasikan Google OAuth 2.0.
+
+Jangan meminta user memasukkan password YouTube.
+
+Flow:
+
+```text
+Dashboard
+   ↓
+Connect YouTube
+   ↓
+Google OAuth
+   ↓
+Permission
+   ↓
+Callback
+   ↓
+Get channel
+   ↓
+Save encrypted token
+   ↓
+Channel appears in dashboard
+```
+
+Gunakan OAuth scope seminimal mungkin sesuai kebutuhan.
+
+Untuk fitur yang membutuhkan perubahan data YouTube, gunakan OAuth authorization.
+
+Refresh token harus disimpan secara aman dan terenkripsi.
+
+Buat endpoint:
+
+```text
+GET /api/auth/google
+GET /api/auth/google/callback
+POST /api/youtube/disconnect
+GET /api/youtube/accounts
+```
+
+Jika OAuth belum dikonfigurasi, tampilkan error yang jelas:
+
+```text
+Google OAuth is not configured.
+Please configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.
+```
+
+Jangan crash.
+
+---
+
+# 7. YOUTUBE SERVICE LAYER
+
+Jangan mencampur kode YouTube API dengan router.
+
+Buat:
+
+```text
+youtube_service.py
+```
+
+Service harus memiliki fungsi minimal:
+
+```python
+get_channel()
+get_channels()
+get_videos()
+get_video()
+update_video()
+upload_video()
+delete_video()
+get_playlists()
+create_playlist()
+update_playlist()
+get_comments()
+reply_comment()
+```
+
+Pisahkan:
+
+```text
+YouTube API
+YouTube Analytics API
+AI Service
+Database
+```
+
+Gunakan service layer.
+
+---
+
+# 8. ANALYTICS ENGINE
+
+Buat analytics service.
+
+Dashboard harus dapat menampilkan:
+
+* Views
+* Watch time
+* Subscribers
+* Average view duration
+* Likes
+* Comments
+* Shares
+* Estimated revenue jika tersedia
+* Top videos
+* Worst-performing videos
+* Growth trend
+
+Tambahkan filter:
+
+```text
+7 days
+28 days
+90 days
+365 days
+Custom
+```
+
+Buat grafik.
+
+---
+
+# 9. AI YOUTUBE EMPLOYEE
+
+Ini adalah bagian terpenting.
+
+Jangan membuat AI hanya berupa:
+
+```text
+POST /chat
+```
+
+Buat sistem agent.
+
+Contoh:
+
+```text
+AI YouTube Manager
+│
+├── Channel Analyst
+├── SEO Specialist
+├── Content Strategist
+├── Title Specialist
+├── Description Specialist
+├── Analytics Analyst
+├── Publishing Manager
+├── Comment Assistant
+└── Decision Engine
+```
+
+Semua agent dapat menggunakan tools sesuai permission.
+
+---
+
+# 10. AI TOOL SYSTEM
+
+Buat tool abstraction seperti:
+
+```text
+get_channel_info
+get_channel_videos
+get_video_analytics
+get_channel_analytics
+search_channel_videos
+get_comments
+create_video_draft
+update_video_metadata
+create_playlist
+schedule_upload
+upload_video
+generate_title
+generate_description
+generate_seo
+analyze_video
+analyze_channel
+create_content_plan
+```
+
+AI tidak boleh langsung menjalankan arbitrary Python atau shell.
+
+Gunakan allowlist tools.
+
+---
+
+# 11. AI PERMISSION SYSTEM
+
+Buat 3 level.
+
+## READ
+
+AI boleh:
+
+* membaca channel
+* membaca video
+* membaca analytics
+* membaca komentar
+* menganalisis data
+
+## WRITE
+
+AI dapat:
+
+* membuat draft
+* mengubah metadata
+* membuat playlist
+* membuat content plan
+
+## HIGH RISK
+
+Memerlukan approval:
+
+* publish video
+* delete video
+* mengubah visibility
+* tindakan yang berdampak besar pada channel
+
+Contoh:
+
+```text
+AI wants to publish:
+
+Title:
+CLASSIC COUNTRY HITS 60s 70s 80s
+
+Visibility:
+PUBLIC
+
+Risk:
+HIGH
+
+Reason:
+Content has completed validation.
+
+[ APPROVE ]
+[ REJECT ]
+```
+
+---
+
+# 12. AI CHAT DASHBOARD
+
+Buat halaman:
+
+```text
+/ai
+```
+
+UI seperti AI employee.
+
+User dapat mengetik:
+
+```text
+Analisis channel saya hari ini.
+```
+
+AI harus:
+
+1. mengetahui channel yang dipilih.
+2. mengambil analytics.
+3. mengambil video terbaru.
+4. menganalisis.
+5. memberikan kesimpulan.
+6. memberikan rekomendasi.
+7. menawarkan tindakan.
+
+Contoh:
+
+```text
+AI MANAGER
+
+Saya menemukan 3 hal:
+
+1. Video A memiliki CTR tinggi.
+2. Video B memiliki retention rendah.
+3. Video C memiliki pertumbuhan subscriber tinggi.
+
+Rekomendasi:
+
+→ Buat 3 video turunan dari Video A.
+→ Perbaiki opening Video B.
+→ Gunakan format Video C untuk content plan minggu depan.
+
+[ BUAT CONTENT PLAN ]
+[ OPTIMASI VIDEO ]
+[ ANALISIS LEBIH LANJUT ]
+```
+
+---
+
+# 13. COMMAND MODE
+
+Tambahkan command natural language.
+
+Contoh:
+
+```text
+"Analisis channel saya."
+
+"Video mana yang paling bagus minggu ini?"
+
+"Buatkan 10 ide video."
+
+"Buat content plan 30 hari."
+
+"Optimalkan video yang CTR-nya rendah."
+
+"Buatkan 5 judul untuk video ini."
+
+"Upload video ini sebagai private."
+
+"Jadwalkan video ini besok jam 19:00."
+
+"Balas komentar yang positif."
+
+"Berikan laporan channel hari ini."
+```
+
+AI harus mengubah natural language menjadi tool calls.
+
+---
+
+# 14. CONTENT PLANNER
+
+Buat halaman:
+
+```text
+/content-plan
+```
+
+Fitur:
+
+* calendar
+* idea
+* title
+* description
+* target keyword
+* status
+* planned date
+* publish date
+* channel
+* notes
+
+Status:
+
+```text
+IDEA
+DRAFT
+READY
+APPROVAL
+SCHEDULED
+PUBLISHED
+CANCELLED
+```
+
+---
+
+# 15. VIDEO MANAGER
+
+Buat halaman:
+
+```text
+/videos
+```
+
+Tampilkan:
+
+```text
+Thumbnail
+Title
+Views
+CTR jika tersedia
+Watch time
+Published
+Status
+AI Score
+```
+
+Action:
+
+```text
+Analyze
+Edit
+Optimize
+View Analytics
+```
+
+---
+
+# 16. CHANNEL DASHBOARD
+
+Buat:
+
+```text
+/dashboard
+```
+
+Header:
+
+```text
+AI YOUTUBE MANAGER
+```
+
+Card:
+
+```text
+Channels
+Videos
+Views
+Subscribers
+Watch Time
+Revenue
+```
+
+Tambahkan:
+
+```text
+Growth chart
+Top videos
+Underperforming videos
+AI recommendations
+Pending approvals
+Recent actions
+```
+
+---
+
+# 17. MULTI CHANNEL
+
+User dapat menghubungkan beberapa channel.
+
+Contoh:
+
+```text
+My Channels
+
+🟢 Classic Country
+🟢 WaveChill EDM
+🟢 Papua Music
+🟢 Tarling Cirebon
+```
+
+Ketika channel dipilih, semua analytics dan AI context berpindah ke channel tersebut.
+
+Jangan sampai data antar-channel tertukar.
+
+---
+
+# 18. AI MEMORY
+
+Buat memory channel.
+
+AI harus mengetahui:
+
+```text
+Channel niche
+Target audience
+Preferred language
+Country
+Content style
+Upload frequency
+Successful titles
+Successful topics
+Failed topics
+Historical performance
+Brand rules
+```
+
+Contoh:
+
+```text
+Channel:
+Classic Country
+
+Niche:
+Classic Country Music
+
+Audience:
+USA
+
+Language:
+English
+
+Preferred style:
+Vintage Western
+
+Upload frequency:
+Daily
+```
+
+AI menggunakan data tersebut saat membuat keputusan.
+
+---
+
+# 19. AI DECISION ENGINE
+
+Buat sistem evaluasi.
+
+Contoh:
+
+```text
+Video Score:
+
+CTR
+Retention
+Views velocity
+Subscriber conversion
+Watch time
+Engagement
+```
+
+Gunakan formula yang configurable.
+
+Jangan mengklaim bahwa score tersebut adalah metric resmi YouTube.
+
+Namakan:
+
+```text
+AI Performance Score
+```
+
+Contoh:
+
+```text
+AI PERFORMANCE SCORE
+
+86/100
+
+Strong:
+✓ CTR
+✓ Watch time
+✓ Subscriber conversion
+
+Weak:
+⚠ Retention after 30 seconds
+```
+
+---
+
+# 20. APPROVAL CENTER
+
+Buat:
+
+```text
+/approvals
+```
+
+Menampilkan:
+
+```text
+Pending Approval
+
+Change title
+Change description
+Publish video
+Change visibility
+Delete video
+```
+
+Button:
+
+```text
+Approve
+Reject
+View Details
+```
+
+Semua approval dicatat di audit log.
+
+---
+
+# 21. AUDIT LOG
+
+Buat:
+
+```text
+/audit
+```
+
+Contoh:
+
+```text
+10 Aug 2026 14:02
+AI analyzed video #123
+
+10 Aug 2026 14:15
+AI generated new title
+
+10 Aug 2026 14:30
+User approved title change
+
+10 Aug 2026 14:31
+YouTube metadata updated
+```
+
+---
+
+# 22. SECURITY
+
+Ini WAJIB.
+
+Implementasikan:
+
+* encrypted OAuth tokens
+* secure cookies
+* CSRF protection jika relevan
+* input validation
+* rate limiting
+* authentication
+* authorization
+* audit logs
+* secret management
+* no secrets in frontend
+* no secrets in Git
+* `.env` ignored
+* secure HTTP headers
+* production error handling
+
+Jangan pernah menampilkan access token atau refresh token di browser.
+
+---
+
+# 23. ENVIRONMENT VARIABLES
+
+Buat:
+
+```text
+.env.example
+```
+
+Minimal:
+
+```text
+APP_NAME=AI YouTube Manager
+APP_ENV=development
+APP_HOST=0.0.0.0
+APP_PORT=5000
+
+DATABASE_URL=
+
+SECRET_KEY=
+
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=
+
+AI_API_KEY=
+AI_MODEL=
+
+REDIS_URL=
+
+FRONTEND_URL=
+```
+
+Gunakan konfigurasi yang aman.
+
+---
+
+# 24. API STRUCTURE
+
+Gunakan prefix:
+
+```text
+/api
+```
+
+Contoh:
+
+```text
+GET  /api/health
+
+GET  /api/dashboard
+
+GET  /api/channels
+
+GET  /api/channels/{id}
+
+GET  /api/videos
+
+GET  /api/videos/{id}
+
+PATCH /api/videos/{id}
+
+POST /api/videos/upload
+
+GET  /api/analytics/channel
+
+GET  /api/analytics/video/{id}
+
+GET  /api/comments
+
+POST /api/comments/{id}/reply
+
+POST /api/ai/chat
+
+POST /api/ai/analyze-channel
+
+POST /api/ai/analyze-video
+
+POST /api/ai/content-plan
+
+GET  /api/approvals
+
+POST /api/approvals/{id}/approve
+
+POST /api/approvals/{id}/reject
+
+GET /api/audit
+```
+
+---
+
+# 25. UI/UX
+
+Gunakan desain dashboard SaaS modern.
+
+Dark mode sebagai default.
+
+Sidebar:
+
+```text
+🤖 AI Manager
+
+Dashboard
+Channels
+Videos
+Analytics
+Content Plan
+AI Assistant
+Approvals
+Comments
+Playlists
+Audit Logs
+Settings
+```
+
+Gunakan:
+
+* clean
+* professional
+* modern
+* responsive
+* desktop-first
+* mobile-friendly
+
+Jangan membuat UI terlalu ramai.
+
+---
+
+# 26. ERROR HANDLING
+
+Semua API harus mempunyai error handling.
+
+Contoh:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "YOUTUBE_AUTH_EXPIRED",
+    "message": "YouTube authorization has expired. Please reconnect your account."
+  }
+}
+```
+
+Jangan menampilkan traceback Python ke user.
+
+Log traceback di server.
+
+---
+
+# 27. LOGGING
+
+Gunakan structured logging.
+
+Minimal:
+
+```text
+INFO
+WARNING
+ERROR
+```
+
+Catat:
+
+* OAuth
+* API request
+* AI task
+* YouTube action
+* approval
+* upload
+* error
+
+Jangan mencatat secret/token.
+
+---
+
+# 28. BACKGROUND JOBS
+
+Operasi berat jangan blocking request.
+
+Gunakan background worker.
+
+Contoh:
+
+```text
+Analytics sync
+AI analysis
+Video processing
+Content generation
+Scheduled publishing
+```
+
+Jika Redis digunakan, boleh gunakan Celery/RQ/Arq atau sistem task queue yang sederhana dan stabil.
+
+---
+
+# 29. AUTOMATIC ANALYTICS SYNC
+
+Buat job yang dapat dijalankan secara berkala.
+
+Contoh:
+
+```text
+Every 1 hour
+↓
+Sync channel statistics
+
+Every 6 hours
+↓
+Sync video analytics
+
+Every day
+↓
+AI daily analysis
+```
+
+Pastikan job idempotent dan tidak menggandakan data.
+
+---
+
+# 30. DAILY AI REPORT
+
+Buat fitur:
+
+```text
+Daily AI Report
+```
+
+Isi:
+
+```text
+Channel health
+Views growth
+Subscriber growth
+Top videos
+Worst videos
+Opportunities
+Problems
+Recommended actions
+Pending approvals
+```
+
+Buat endpoint:
+
+```text
+POST /api/ai/daily-report
+```
+
+---
+
+# 31. TELEGRAM NOTIFICATION READY
+
+Buat service abstraction:
+
+```text
+NotificationService
+```
+
+Jangan wajibkan Telegram pada MVP.
+
+Tetapi architecture harus siap untuk:
+
+```text
+Telegram
+Email
+Discord
+Webhook
+```
+
+Contoh:
+
+```text
+AI menemukan video bermasalah.
+
+→ Kirim notifikasi:
+
+⚠️ YouTube Alert
+
+Video:
+Classic Country Hits
+
+CTR turun 32%.
+
+AI merekomendasikan thumbnail baru.
+
+[ Open Dashboard ]
+```
+
+---
+
+# 32. DEPLOYMENT
+
+Buat script:
+
+```text
+scripts/install.sh
+```
+
+Script harus membantu setup:
+
+* Python
+* Node.js
+* PostgreSQL
+* Nginx
+* dependencies
+* virtualenv
+* migrations
+* frontend build
+* systemd service
+
+Buat:
+
+```text
+systemd/ai-youtube-manager.service
+```
+
+Backend berjalan di:
+
+```text
+127.0.0.1:5000
+```
+
+Untuk development, boleh bind:
+
+```text
+0.0.0.0:5000
+```
+
+Tetapi dokumentasikan bahwa production sebaiknya menggunakan Nginx.
+
+---
+
+# 33. DIRECT IP ACCESS
+
+Pastikan aplikasi bisa digunakan untuk testing dengan:
+
+```text
+http://IP-VPS:5000
+```
+
+Backend harus listen pada:
+
+```text
+0.0.0.0:5000
+```
+
+Jika firewall digunakan, dokumentasikan:
+
+```text
+sudo ufw allow 5000/tcp
+```
+
+Tetapi berikan peringatan bahwa port 5000 sebaiknya tidak dibuka publik pada production jika menggunakan Nginx.
+
+---
+
+# 34. NGINX
+
+Buat konfigurasi:
+
+```text
+youtube-manager.example.com
+```
+
+Proxy ke:
+
+```text
+127.0.0.1:5000
+```
+
+Siapkan konfigurasi untuk WebSocket jika AI streaming response digunakan.
+
+---
+
+# 35. README
+
+README harus sangat lengkap.
+
+Isi:
+
+1. Requirements
+2. Installation Ubuntu 22.04
+3. PostgreSQL setup
+4. Environment variables
+5. Google Cloud project setup
+6. YouTube API activation
+7. OAuth configuration
+8. AI API configuration
+9. Database migration
+10. Start development server
+11. Production deployment
+12. Nginx
+13. SSL
+14. Firewall
+15. Troubleshooting
+16. Backup
+17. Security
+18. How to connect YouTube channel
+
+---
+
+# 36. GOOGLE CLOUD SETUP DOCUMENTATION
+
+Dokumentasikan secara jelas:
+
+1. Create Google Cloud project.
+2. Enable YouTube Data API v3.
+3. Enable YouTube Analytics API.
+4. Configure OAuth consent screen.
+5. Create OAuth Client.
+6. Configure redirect URI.
+
+Untuk development:
+
+```text
+http://IP-VPS:5000/api/auth/google/callback
+```
+
+Jika Google OAuth tidak mengizinkan HTTP untuk konfigurasi tertentu, dokumentasikan solusi production menggunakan HTTPS/domain.
+
+Jangan mengarang konfigurasi Google.
+
+---
+
+# 37. AI MODEL ABSTRACTION
+
+Jangan mengikat aplikasi ke satu provider AI.
+
+Buat:
+
+```text
+AIProvider
+```
+
+Interface:
+
+```python
+generate()
+generate_structured()
+stream()
+```
+
+Implementasi awal:
+
+```text
+OpenAIProvider
+```
+
+Architecture harus memungkinkan:
+
+```text
+AnthropicProvider
+GoogleProvider
+LocalModelProvider
+```
+
+di masa depan.
+
+---
+
+# 38. AI PROMPT ARCHITECTURE
+
+Buat prompt terpisah:
+
+```text
+system/
+youtube_manager.txt
+channel_analyst.txt
+seo_specialist.txt
+content_strategist.txt
+title_specialist.txt
+analytics_analyst.txt
+```
+
+AI harus selalu mendapatkan context:
+
+```text
+Channel profile
+Recent performance
+Historical performance
+Current task
+User instruction
+Available tools
+Permission level
+```
+
+Jangan memberikan seluruh database ke AI.
+
+Ambil hanya data yang relevan.
+
+---
+
+# 39. AI RESPONSE FORMAT
+
+Untuk task penting, gunakan structured JSON.
+
+Contoh:
+
+```json
+{
+  "summary": "...",
+  "findings": [],
+  "recommendations": [],
+  "actions": [],
+  "confidence": 0.87
+}
+```
+
+Validasi menggunakan Pydantic.
+
+Jangan bergantung pada parsing teks bebas untuk action kritis.
+
+---
+
+# 40. AI SAFETY
+
+AI tidak boleh:
+
+* menghapus video tanpa approval
+* mengubah visibility menjadi public tanpa approval
+* melakukan arbitrary shell command
+* membaca `.env`
+* membaca private filesystem yang tidak diperlukan
+* mengakses token mentah
+* mengubah database secara langsung
+* mengeksekusi SQL bebas
+* melakukan tindakan di luar tool allowlist
+
+AI hanya boleh menggunakan tools yang diberikan.
+
+---
+
+# 41. TESTING
+
+Buat tests untuk:
+
+```text
+OAuth
+YouTube service
+Analytics service
+AI tools
+Permission system
+Approval system
+Database
+API
+Authentication
+```
+
+Minimal unit tests untuk bagian penting.
+
+Buat juga:
+
+```text
+GET /api/health
+```
+
+yang menghasilkan:
+
+```json
+{
+  "status": "ok",
+  "app": "AI YouTube Manager"
+}
+```
+
+---
+
+# 42. HEALTH CHECK
+
+Dashboard harus menunjukkan:
+
+```text
+System Health
+
+Backend       🟢
+Database      🟢
+YouTube API   🟢
+AI Provider   🟢
+Redis         🟢
+```
+
+Jika credential belum tersedia:
+
+```text
+YouTube API   🟡 Not configured
+```
+
+bukan error fatal.
+
+---
+
+# 43. FIRST RUN EXPERIENCE
+
+Saat pertama kali membuka:
+
+```text
+http://IP-VPS:5000
+```
+
+tampilkan:
+
+```text
+🤖 AI YOUTUBE MANAGER
+
+Your AI employee for YouTube.
+
+[ Get Started ]
+```
+
+Kemudian:
+
+```text
+1. Create account
+2. Configure AI
+3. Connect YouTube
+4. Select channel
+5. Run first analysis
+```
+
+---
+
+# 44. MVP PRIORITY
+
+Jangan mencoba menyelesaikan semua fitur sekaligus jika terlalu besar.
+
+Prioritas wajib:
+
+### PHASE 1
+
+* authentication
+* dashboard
+* Google OAuth
+* connect YouTube
+* channel information
+* videos
+* analytics
+* AI chat
+* AI channel analysis
+* approval system
+* audit log
+
+### PHASE 2
+
+* upload
+* metadata editing
+* playlist
+* comments
+* content planner
+
+### PHASE 3
+
+* background automation
+* daily report
+* Telegram
+* advanced AI agent
+* multi-channel automation
+
+Tetapi project structure harus sudah mendukung semuanya.
+
+---
+
+# 45. DEVELOPMENT RULE
+
+Jangan berhenti setelah membuat file.
+
+Setelah coding:
+
+1. Install dependencies.
+2. Run migrations.
+3. Build frontend.
+4. Run backend.
+5. Test health endpoint.
+6. Test frontend.
+7. Test database.
+8. Test OAuth configuration.
+9. Fix errors.
+10. Run tests.
+11. Periksa logs.
+
+Jika menemukan error, perbaiki sampai aplikasi bisa dijalankan.
+
+Jangan mengatakan "sudah selesai" hanya karena file berhasil dibuat.
+
+---
+
+# 46. FINAL ACCEPTANCE TEST
+
+Aplikasi dianggap berhasil hanya jika:
+
+```text
+[✓] Ubuntu 22.04 compatible
+[✓] Backend starts
+[✓] Frontend starts
+[✓] http://IP-VPS:5000 opens
+[✓] Database connects
+[✓] Dashboard renders
+[✓] Google OAuth flow exists
+[✓] YouTube account can be connected
+[✓] Channel data can be retrieved
+[✓] Video list can be retrieved
+[✓] Analytics endpoint exists
+[✓] AI service works when API key configured
+[✓] AI can analyze channel
+[✓] AI permission system works
+[✓] Approval system works
+[✓] Audit log works
+[✓] No secrets exposed
+[✓] README contains deployment instructions
+```
+
+---
+
+# 47. IMPORTANT CODING BEHAVIOR
+
+Anda bertindak sebagai engineer yang benar-benar mengerjakan project.
+
+Jangan hanya memberikan tutorial.
+
+Buat file project yang lengkap.
+
+Jika repository kosong, mulai dari nol.
+
+Jika repository sudah berisi kode, inspect terlebih dahulu dan gunakan kode yang ada jika masih baik.
+
+Jangan menghapus fitur existing tanpa alasan.
+
+Jangan mengganti architecture secara sembarangan.
+
+Prioritaskan:
+
+```text
+Security
+Reliability
+Maintainability
+Real API integration
+Clean architecture
+Good UX
+```
+
+daripada sekadar tampilan.
+
+---
+
+# 48. OUTPUT SETELAH SELESAI
+
+Setelah implementasi selesai, berikan ringkasan:
+
+```text
+PROJECT COMPLETED
+
+Backend:
+...
+
+Frontend:
+...
+
+Database:
+...
+
+YouTube:
+...
+
+AI:
+...
+
+Deployment:
+...
+
+Testing:
+...
+
+Remaining configuration:
+...
+```
+
+Kemudian berikan command yang diperlukan untuk menjalankan aplikasi.
+
+Target akhir:
+
+```text
+http://IP-VPS:5000
+```
+
+Aplikasi harus siap dikembangkan menjadi **AI employee yang benar-benar mengelola channel YouTube secara semi-otomatis maupun otomatis dengan sistem approval dan audit trail.**
+
+* authentication
+* dashboard
+* Google OAuth
+* connect YouTube
+* channel information
+* videos
+* analytics
+* AI chat
+* AI channel analysis
+* approval system
+* audit log
+
+### PHASE 2
+
+* upload
+* metadata editing
+* playlist
+* comments
+* content planner
+
+### PHASE 3
+
+* background automation
+* daily report
+* Telegram
+* advanced AI agent
+* multi-channel automation
+
+Tetapi project structure harus sudah mendukung semuanya.
+
+---
+
+# 45. DEVELOPMENT RULE
+
+Jangan berhenti setelah membuat file.
+
+Setelah coding:
+
+1. Install dependencies.
+2. Run migrations.
+3. Build frontend.
+4. Run backend.
+5. Test health endpoint.
+6. Test frontend.
+7. Test database.
+8. Test OAuth configuration.
+9. Fix errors.
+10. Run tests.
+11. Periksa logs.
+
+Jika menemukan error, perbaiki sampai aplikasi bisa dijalankan.
+
+Jangan mengatakan "sudah selesai" hanya karena file berhasil dibuat.
+
+---
+
+# 46. FINAL ACCEPTANCE TEST
+
+Aplikasi dianggap berhasil hanya jika:
+
+```text
+[✓] Ubuntu 22.04 compatible
+[✓] Backend starts
+[✓] Frontend starts
+[✓] http://IP-VPS:5000 opens
+[✓] Database connects
+[✓] Dashboard renders
+[✓] Google OAuth flow exists
+[✓] YouTube account can be connected
+[✓] Channel data can be retrieved
+[✓] Video list can be retrieved
+[✓] Analytics endpoint exists
+[✓] AI service works when API key configured
+[✓] AI can analyze channel
+[✓] AI permission system works
+[✓] Approval system works
+[✓] Audit log works
+[✓] No secrets exposed
+[✓] README contains deployment instructions
+```
+
+---
+
+# 47. IMPORTANT CODING BEHAVIOR
+
+Anda bertindak sebagai engineer yang benar-benar mengerjakan project.
+
+Jangan hanya memberikan tutorial.
+
+Buat file project yang lengkap.
+
+Jika repository kosong, mulai dari nol.
+
+Jika repository sudah berisi kode, inspect terlebih dahulu dan gunakan kode yang ada jika masih baik.
+
+Jangan menghapus fitur existing tanpa alasan.
+
+Jangan mengganti architecture secara sembarangan.
+
+Prioritaskan:
+
+```text
+Security
+Reliability
+Maintainability
+Real API integration
+Clean architecture
+Good UX
+```
+
+daripada sekadar tampilan.
+
+---
+
+# 48. OUTPUT SETELAH SELESAI
+
+Setelah implementasi selesai, berikan ringkasan:
+
+```text
+PROJECT COMPLETED
+
+Backend:
+...
+
+Frontend:
+...
+
+Database:
+...
+
+YouTube:
+...
+
+AI:
+...
+
+Deployment:
+...
+
+Testing:
+...
+
+Remaining configuration:
+...
+```
+
+Kemudian berikan command yang diperlukan untuk menjalankan aplikasi.
+
+Target akhir:
+
+```text
+http://IP-VPS:5000
+```
+
+Aplikasi harus siap dikembangkan menjadi **AI employee yang benar-benar mengelola channel YouTube secara semi-otomatis maupun otomatis dengan sistem approval dan audit trail.**

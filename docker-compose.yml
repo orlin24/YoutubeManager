@@ -1,0 +1,59 @@
+# AI YouTube Manager - docker-compose
+# Usage:
+#   cp .env.example .env   # set POSTGRES_PASSWORD and secrets
+#   docker compose up -d --build
+#   open http://localhost:5000  (or your server IP)
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ai_youtube_manager
+      POSTGRES_USER: aym
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aym -d ai_youtube_manager"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://aym:${POSTGRES_PASSWORD:-change_me}@db:5432/ai_youtube_manager
+      SECRET_KEY: ${SECRET_KEY:-}
+      APP_ENV: ${APP_ENV:-production}
+      APP_ORIGINS: ${APP_ORIGINS:-http://localhost:5000,http://localhost:80}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:5000/api/auth/google/callback}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5000}
+    ports:
+      - "5000:5000"
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+  # Optional extras; enable with: docker compose --profile full up -d
+  redis:
+    image: redis:7-alpine
+    profiles: ["full"]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
