@@ -443,6 +443,27 @@ def enqueue(db: Session, idea: ContentIdea, brief: ContentBrief | None = None) -
     return item
 
 
+def advance(db: Session, item: ContentQueue) -> ContentQueue:
+    """Majukan item queue satu tahap pipeline (QUALITY_CHECK -> READY -> ...).
+
+    Saat mencapai SCHEDULED dan belum ada publish_date, isi otomatis besok.
+    Saat PUBLISHED/COMPLETED, catat completed_at. Mengembalikan item yang sama.
+    """
+    if item.status not in PIPELINE:
+        raise AppError(400, "INVALID_STATUS", f"Status '{item.status}' tidak dikenal.")
+    idx = PIPELINE.index(item.status)
+    if idx >= len(PIPELINE) - 1:
+        raise AppError(400, "INVALID_STATUS", f"Status '{item.status}' tidak bisa dimajukan.")
+    item.status = PIPELINE[idx + 1]
+    if item.status == "SCHEDULED" and item.publish_date is None:
+        item.publish_date = date.today() + timedelta(days=1)
+    if item.status in ("PUBLISHED", "COMPLETED"):
+        item.completed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
 def _offline_ideas(db: Session, channel: Channel, count: int) -> list[dict[str, Any]]:
     """Ide simulasi dari data channel NYATA tanpa LLM (fallback dry-run)."""
     videos = (db.query(Video).filter(Video.channel_id == channel.id)

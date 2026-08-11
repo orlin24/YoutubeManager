@@ -1,1 +1,0 @@
-import{j as e}from"./index-DWoYIkE7.js";function o({rows:s=3}){return e.jsx("div",{className:"space-y-2",children:Array.from({length:s}).map((r,a)=>e.jsx("div",{className:"h-10 animate-pulse rounded-lg bg-zinc-800/60"},a))})}export{o as S};

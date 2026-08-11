@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { CalendarDays, RefreshCw } from "lucide-react";
-import { buildCalendar, fetchFactoryQueue, runContentPipeline } from "../../services/api";
+import { advanceQueueItem, buildCalendar, fetchFactoryQueue, runContentPipeline } from "../../services/api";
 import { Badge } from "../../components/common/Badge";
 import { Button, Spinner } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
@@ -11,6 +11,18 @@ const TYPE_TONE: Record<string, "green" | "blue" | "violet" | "gray"> = {
   PROVEN: "green",
   VARIATION: "blue",
   EXPERIMENT: "violet",
+};
+
+// Status yang bisa dimajukan satu tahap pipeline.
+const ADVANCEABLE: Record<string, boolean> = {
+  RESEARCH: true,
+  BRIEF: true,
+  DRAFT: true,
+  QUALITY_CHECK: true,
+  READY: true,
+  PRODUCTION: true,
+  UPLOAD_QUEUE: true,
+  SCHEDULED: true,
 };
 
 export default function CalendarPage() {
@@ -59,6 +71,19 @@ export default function CalendarPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Pipeline gagal.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onAdvance = async (q: { id: string; title: string; status: string }) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await advanceQueueItem(q.id);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal memajukan status.");
     } finally {
       setBusy(false);
     }
@@ -164,6 +189,14 @@ export default function CalendarPage() {
                       <p className="truncate text-sm text-zinc-200">{q.title}</p>
                       <p className="text-xs text-zinc-600">prioritas {q.priority} · {q.status}</p>
                     </div>
+                    <button
+                      className="rounded-md border border-brand-500/40 px-2 py-1 text-xs text-brand-300 hover:bg-brand-500/10 disabled:opacity-40"
+                      disabled={busy || !ADVANCEABLE[q.status]}
+                      title="Majukan satu tahap pipeline"
+                      onClick={() => onAdvance(q)}
+                    >
+                      Advance →
+                    </button>
                   </div>
                 ))}
               </div>

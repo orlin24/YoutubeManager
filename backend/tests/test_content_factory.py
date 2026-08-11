@@ -110,3 +110,43 @@ def test_ceo_overview_and_priorities(db_session):
     assert len(prio) >= 1
     rec = ceo_service.recommendation(db_session, [ch.id])
     assert rec["decision"] in ("SCALE", "RECOVER", "MAINTAIN", "EXPERIMENT")
+
+
+def test_advance_queue_status(db_session):
+    """advance() memajukan item satu tahap pipeline & mengisi publish_date."""
+    ch = _seed(db_session)
+    idea = ContentIdea(channel_id=ch.id, topic="Ide Test", angle="x", format="musik",
+                       reason="r", confidence="HIGH", content_type="PROVEN", priority=8, status="IDEA")
+    db_session.add(idea)
+    db_session.commit()
+    q = ContentQueue(channel_id=ch.id, idea_id=idea.id, title="Judul Test",
+                     content_type="PROVEN", priority=8, status="QUALITY_CHECK")
+    db_session.add(q)
+    db_session.commit()
+
+    from app.services import content_factory as cf
+    cf.advance(db_session, q)
+    assert q.status == "READY"
+
+    cf.advance(db_session, q)
+    assert q.status == "PRODUCTION"
+
+    # maju sampai SCHEDULED -> publish_date otomatis terisi
+    for _ in range(5):
+        cf.advance(db_session, q)
+    assert q.status == "COMPLETED"
+    assert q.publish_date is not None or q.completed_at is not None
+
+
+def test_advance_queue_blocks_completed(db_session):
+    ch = _seed(db_session)
+    q = ContentQueue(channel_id=ch.id, title="X", content_type="PROVEN", priority=5, status="COMPLETED")
+    db_session.add(q)
+    db_session.commit()
+    from app.utils.errors import AppError
+    from app.services import content_factory as cf
+    try:
+        cf.advance(db_session, q)
+        assert False, "harusnya error"
+    except AppError:
+        pass

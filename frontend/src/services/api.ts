@@ -494,6 +494,10 @@ export const fetchFactoryQueue = (channelId: string) =>
   api.get<{ items: Array<{ id: string; title: string; content_type: string; status: string; priority: number; publish_date?: string | null; notes: string }> }>(
     `/content-factory/queue?channel_id=${channelId}`
   );
+export const advanceQueueItem = (queueId: string) =>
+  api.post<{ id: string; status: string; publish_date?: string | null }>(
+    `/content-factory/queue/${queueId}/advance`
+  );
 export const buildCalendar = (channelId: string, days = 7) =>
   api.post<{ plan: Array<{ date: string; title: string; content_type: string; status: string; priority: number; queue_id: string }> }>(
     "/content-factory/calendar",

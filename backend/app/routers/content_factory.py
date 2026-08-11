@@ -1,6 +1,8 @@
 """Content Factory + AI CEO endpoints."""
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -84,6 +86,24 @@ def list_queue(channel_id: str, user: User = Depends(get_current_user),
     rows = db.query(ContentQueue).filter_by(channel_id=channel_id).order_by(ContentQueue.created_at.desc()).limit(50).all()
     return {"items": [{"id": q.id, "title": q.title, "content_type": q.content_type, "status": q.status,
                        "priority": q.priority, "publish_date": q.publish_date, "notes": q.notes} for q in rows]}
+
+
+@router.post("/content-factory/queue/{queue_id}/advance")
+def advance_queue(queue_id: str, request: Request, user: User = Depends(get_current_user),
+                  db: Session = Depends(get_db)) -> dict:
+    """Majukan item Content Queue satu tahap pipeline (atau ke status target)."""
+    check_csrf(request)
+    item = db.get(ContentQueue, queue_id)
+    if item is None:
+        raise AppError(404, "NOT_FOUND", "Item queue tidak ditemukan.")
+    get_user_channel(db, user, item.channel_id)
+
+    content_factory.advance(db, item)
+
+    log_audit(db, user_id=user.id, channel_id=item.channel_id, action="queue_advance",
+              target=(item.title or item.id)[:80], result="ok",
+              metadata={"queue_id": item.id, "status": item.status})
+    return {"id": item.id, "status": item.status, "publish_date": item.publish_date}
 
 
 @router.post("/content-factory/calendar")
