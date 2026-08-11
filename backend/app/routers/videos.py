@@ -225,8 +225,12 @@ def _run_upload(upload_id: str, tmp_path: str, resume_uri: str | None = None) ->
                                                thumb_mime or "image/jpeg")
             except AppError as exc:
                 thumb_warning = f"Video terupload, tapi thumbnail gagal: {exc.message}"
-            except Exception:  # noqa: BLE001
+                logger.error("Thumbnail upload AppError for %s: %s",
+                             video.youtube_video_id, exc.message)
+            except Exception as exc:  # noqa: BLE001
                 thumb_warning = "Video terupload, tapi thumbnail gagal (coba lagi dari Edit video)."
+                logger.error("Thumbnail upload failed for %s: %s",
+                             video.youtube_video_id, exc, exc_info=True)
 
         log_audit(db, user_id=user_id, channel_id=channel_id, action="video_uploaded",
                   target=video.title, result="ok",

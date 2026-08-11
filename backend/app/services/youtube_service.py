@@ -378,6 +378,43 @@ class YouTubeService:
         )
         return {"youtube_video_id": video_id, "thumbnail_url": url}
 
+    def set_thumbnail_when_ready(
+        self, client, video_id: str, file_bytes: bytes, mimetype: str = "image/jpeg",
+        timeout_s: int = 420,
+    ) -> dict:
+        """Set a thumbnail, waiting for YouTube to finish processing the video.
+
+        Right after an upload finishes, YouTube is still transcoding the video
+        and thumbnails.set fails (403/409 "processing"). Poll processingDetails
+        until it succeeds, then retry the thumbnail a few times.
+        """
+        import time
+
+        deadline = time.monotonic() + timeout_s
+        # Phase 1: wait until the video is no longer processing.
+        while time.monotonic() < deadline:
+            try:
+                resp = safe_call(client.videos().list, part="processingDetails", id=video_id)
+                item = (resp.get("items") or [{}])[0]
+                status = item.get("processingDetails", {}).get("processingStatus")
+                if status in (None, "succeeded", "failed"):
+                    break
+            except AppError:
+                pass
+            time.sleep(15)
+        # Phase 2: upload the thumbnail, retrying transient rejections.
+        last_error: Exception | None = None
+        while time.monotonic() < deadline:
+            try:
+                return self.set_thumbnail(client, video_id, file_bytes, mimetype)
+            except AppError as exc:
+                last_error = exc
+                time.sleep(10)
+        raise last_error or AppError(
+            408, "THUMBNAIL_TIMEOUT",
+            "Waktu habis menunggu thumbnail bisa di-set - coba lagi dari Edit video.",
+        )
+
     def get_traffic_sources(self, analytics_client, channel_id: str, days: int = 28) -> list[dict]:
         """Views broken down by traffic source (e.g. video recommendations, search),
         so the AI can reason about WHERE the channel's views come from."""
@@ -795,7 +832,11 @@ def update_video_thumbnail(
     db: Session, account: YouTubeAccount, video: Video, file_bytes: bytes, mimetype: str
 ) -> Video:
     client = get_authenticated_client(db, account)
-    result = YouTubeService().set_thumbnail(client, video.youtube_video_id, file_bytes, mimetype)
+    # Tunggu video selesai diproses YouTube dulu (penting untuk upload baru),
+    # lalu set thumbnail dengan retry. Endpoint Edit tetap instan (video lama).
+    result = YouTubeService().set_thumbnail_when_ready(
+        client, video.youtube_video_id, file_bytes, mimetype
+    )
     if result.get("thumbnail_url"):
         video.thumbnail_url = result["thumbnail_url"]
         db.commit()
