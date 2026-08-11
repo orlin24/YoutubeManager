@@ -356,10 +356,45 @@ class YouTubeService:
         )
         return {"id": resp.get("id", ""), "text": text}
 
+    @staticmethod
+    def _compress_thumbnail(file_bytes: bytes, mimetype: str) -> tuple[bytes, str]:
+        """Kompres thumbnail agar <= ~1.9MB (batas YouTube 2MB).
+
+        Memakai Pillow bila tersedia: resize maks 1280px (sisi terpanjang),
+        konversi ke RGB, simpan JPEG dengan quality turun bertahap sampai
+        muat. Kalau sudah kecil / Pillow tidak ada, dikembalikan apa adanya.
+        """
+        if len(file_bytes) <= 1_900_000:
+            return file_bytes, mimetype
+        try:
+            from PIL import Image
+        except Exception:  # noqa: BLE001 - Pillow tidak tersedia
+            return file_bytes, mimetype
+        try:
+            img = Image.open(io.BytesIO(file_bytes))
+            img.load()
+            img = img.convert("RGB")
+            # YouTube thumbnail 16:9; jangan zoom-crop, cukup batasi sisi panjang
+            img.thumbnail((1280, 1280), Image.LANCZOS)
+            for quality in (82, 65, 50, 35):
+                buf = io.BytesIO()
+                img.save(buf, "JPEG", quality=quality, optimize=True)
+                if buf.tell() <= 1_900_000:
+                    return buf.getvalue(), "image/jpeg"
+            return buf.getvalue(), "image/jpeg"
+        except Exception:  # noqa: BLE001 - gambar rusak / format aneh
+            return file_bytes, mimetype
+
     def set_thumbnail(self, client, video_id: str, file_bytes: bytes, mimetype: str = "image/jpeg") -> dict:
-        """Upload a custom thumbnail (JPEG/PNG/WEBP, max 2MB, 16:9 recommended)."""
+        """Upload a custom thumbnail (JPEG/PNG/WEBP, max 2MB, 16:9 recommended).
+
+        File lebih besar dari batas YouTube (2MB) dikompres otomatis
+        (resize maks 1280px + JPEG quality turun bertahap) agar tidak gagal
+        dengan MediaUploadSizeError.
+        """
         from googleapiclient.http import MediaIoBaseUpload
 
+        file_bytes, mimetype = self._compress_thumbnail(file_bytes, mimetype)
         media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype=mimetype, resumable=False)
         # safe_call invokes .execute() on the returned request object.
         resp = safe_call(lambda: client.thumbnails().set(videoId=video_id, media_body=media))

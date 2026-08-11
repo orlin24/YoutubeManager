@@ -119,3 +119,37 @@ def test_set_thumbnail_raises_when_timeout(monkeypatch):
     with pytest.raises(AppError) as ei:
         svc.set_thumbnail_when_ready(client, "vid1", b"png", "image/png", timeout_s=1)
     assert ei.value.code == "THUMBNAIL_TIMEOUT"
+
+
+def test_compress_thumbnail_large_file(monkeypatch):
+    """Thumbnail > 2MB dikompres otomatis ke JPEG < 1.9MB."""
+    from PIL import Image
+    import io as _io
+
+    # gambar 4000x2250 ~ 16:9, kualitas tinggi -> > 2MB sebagai PNG
+    img = Image.new("RGB", (4000, 2250), (30, 60, 120))
+    buf = _io.BytesIO()
+    img.save(buf, "PNG")
+    big = buf.getvalue()
+    assert len(big) > 2_000_000 or True  # PNG solid bisa kecil; buat noise
+    # bikin benar-benar besar pakai noise biar > 2MB
+    import random
+    random.seed(1)
+    img = Image.frombytes("RGB", (2000, 1500),
+                          bytes(random.randrange(256) for _ in range(2000 * 1500 * 3)))
+    buf2 = _io.BytesIO()
+    img.save(buf2, "PNG")
+    big = buf2.getvalue()
+    assert len(big) > 2_000_000, f"test image too small: {len(big)}"
+
+    out, mime = YouTubeService._compress_thumbnail(big, "image/png")
+    assert len(out) <= 1_900_000
+    assert mime == "image/jpeg"
+    assert out[:3] == b"\xff\xd8\xff"  # JPEG magic
+
+
+def test_compress_thumbnail_small_passthrough():
+    small = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+    out, mime = YouTubeService._compress_thumbnail(small, "image/png")
+    assert out == small
+    assert mime == "image/png"

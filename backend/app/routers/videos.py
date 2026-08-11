@@ -473,8 +473,10 @@ async def upload_thumbnail(
         raise AppError(422, "VALIDATION_ERROR",
                        "Thumbnail harus berupa file JPEG, PNG, atau WEBP.")
     data = await file.read()
-    if len(data) > 2 * 1024 * 1024:
-        raise AppError(413, "FILE_TOO_LARGE", "Thumbnail maksimal 2MB. Gunakan 16:9 (misal 1280x720).")
+    if len(data) > 10 * 1024 * 1024:
+        raise AppError(413, "FILE_TOO_LARGE",
+                       "Thumbnail terlalu besar (maks 10MB). Gunakan 16:9 (misal 1280x720).")
+    # File > 2MB (batas YouTube) otomatis dikompres di set_thumbnail.
     account = get_user_account(db, user, video.channel_id)
     from app.services.youtube_service import update_video_thumbnail
 
