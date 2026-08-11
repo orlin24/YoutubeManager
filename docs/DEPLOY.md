@@ -23,10 +23,10 @@ tanpa perlu compile).
 ## Install otomatis (cara cepat)
 
 ```bash
-# Repo publik
+# Repo PUBLIK
 curl -fsSL https://raw.githubusercontent.com/orlin24/YoutubeManager/main/scripts/install.sh | bash
 
-# atau clone lalu jalankan langsung
+# atau clone lalu jalankan langsung (publik atau privat - lihat bagian token)
 git clone https://github.com/orlin24/YoutubeManager.git
 cd YoutubeManager
 sudo bash scripts/install.sh
@@ -45,16 +45,35 @@ Yang dilakukan installer:
 
 Selesai: buka `http://<IP-server>:5000`, buat akun admin di halaman login.
 
-### Repo privat (token GitHub)
+### Repo PRIVAT (kasus ini)
 
-Jika repo diset privat, beri token saat install:
+Repo privat = `curl ... | bash` TIDAK bisa (raw.githubusercontent 403/404 tanpa token).
+Dua cara yang berfungsi:
+
+**Cara 1 - clone dulu, lalu jalankan installer (paling sederhana):**
 
 ```bash
-sudo AYM_GITHUB_TOKEN=github_pat_xxx bash scripts/install.sh
+# di server, jalankan sebagai root
+sudo -i
+git clone https://<TOKEN>@github.com/orlin24/YoutubeManager.git /tmp/aym-install
+cd /tmp/aym-install
+sudo AYM_GITHUB_TOKEN=<TOKEN> bash scripts/install.sh
 ```
 
-Token disimpan di `/opt/ai-youtube-manager/.github-token` (chmod 600) dan dipakai
-oleh `update.sh` untuk git pull otomatis. Token **tidak pernah** disimpan di repo.
+**Cara 2 - download installer langsung dengan token:**
+
+```bash
+sudo -i
+curl -fsSL -H "Authorization: Bearer <TOKEN>" \
+  https://raw.githubusercontent.com/orlin24/YoutubeManager/main/scripts/install.sh \
+  -o /tmp/install-aym.sh
+sudo AYM_GITHUB_TOKEN=<TOKEN> bash /tmp/install-aym.sh
+```
+
+Ganti `<TOKEN>` dengan fine-grained PAT yang punya akses **Contents: Read/Write**
+pada repo ini. Token disimpan di `/opt/ai-youtube-manager/.github-token`
+(chmod 600) dan dipakai oleh `update.sh` untuk git pull otomatis. Token
+**tidak pernah** disimpan di repo.
 
 ## Database: SQLite vs PostgreSQL
 
