@@ -424,12 +424,20 @@ def quality_check(db: Session, brief: ContentBrief, persist: bool = True) -> dic
 
 
 def enqueue(db: Session, idea: ContentIdea, brief: ContentBrief | None = None) -> ContentQueue:
-    dup = duplication_check(db, idea.channel_id, brief.title_concept if brief else idea.topic)
+    title = ""
+    if brief:
+        title = brief.title_concept or ""
+        if not title and brief.title_variants:
+            first = brief.title_variants[0]
+            title = first.get("title", "") if isinstance(first, dict) else str(first)
+    if not title:
+        title = idea.topic or ""
+    dup = duplication_check(db, idea.channel_id, title)
     item = ContentQueue(
         channel_id=idea.channel_id,
         idea_id=idea.id,
         brief_id=brief.id if brief else None,
-        title=brief.title_concept if brief else idea.topic,
+        title=title,
         content_type=idea.content_type,
         status="QUALITY_CHECK" if brief else "READY",
         priority=idea.priority,

@@ -491,7 +491,29 @@ export const generateIdeas = (channelId: string, count = 6) =>
     { channel_id: channelId, count }
   );
 export const fetchFactoryQueue = (channelId: string) =>
-  api.get<{ items: Array<{ id: string; title: string; content_type: string; status: string; priority: number; publish_date?: string | null; notes: string }> }>(
+  api.get<{ items: Array<{
+    id: string;
+    title: string;
+    content_type: string;
+    status: string;
+    priority: number;
+    publish_date?: string | null;
+    notes: string;
+    brief: {
+      title_variants?: string[];
+      thumbnail_concept?: string;
+      thumbnail_variants?: string[];
+      script_title?: string;
+      script_hook?: string;
+      script_outline?: unknown;
+      keywords?: string[];
+      hook?: string;
+      audience?: string;
+      duration?: string;
+      quality_score?: number | null;
+      quality_result?: string | null;
+    };
+  }> }>(
     `/content-factory/queue?channel_id=${channelId}`
   );
 export const advanceQueueItem = (queueId: string) =>

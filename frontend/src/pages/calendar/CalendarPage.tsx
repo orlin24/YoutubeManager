@@ -28,7 +28,30 @@ const ADVANCEABLE: Record<string, boolean> = {
 export default function CalendarPage() {
   const { channels, selectedChannelId, selectChannel, refreshChannels } = useChannelStore();
   const [plan, setPlan] = useState<Array<{ date: string; title: string; content_type: string; status: string; priority: number }>>([]);
-  const [queue, setQueue] = useState<Array<{ id: string; title: string; content_type: string; status: string; priority: number }>>([]);
+  const [queue, setQueue] = useState<Array<{
+    id: string;
+    title: string;
+    content_type: string;
+    status: string;
+    priority: number;
+    publish_date?: string | null;
+    notes?: string;
+    brief?: {
+      title_variants?: string[];
+      thumbnail_concept?: string;
+      thumbnail_variants?: string[];
+      script_title?: string;
+      script_hook?: string;
+      script_outline?: unknown;
+      keywords?: string[];
+      hook?: string;
+      audience?: string;
+      duration?: string;
+      quality_score?: number | null;
+      quality_result?: string | null;
+    };
+  }>>([]);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [dryRun, setDryRun] = useState<{ ideas: Array<{ idea: string; quality: string; score: number; queue_id: string | null }>; queued: number; note?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -183,20 +206,28 @@ export default function CalendarPage() {
             ) : (
               <div className="space-y-2">
                 {queue.map((q) => (
-                  <div key={q.id} className="flex items-start gap-3 rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
-                    <Badge tone={TYPE_TONE[q.content_type] ?? "gray"}>{q.content_type}</Badge>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-zinc-200">{q.title}</p>
-                      <p className="text-xs text-zinc-600">prioritas {q.priority} · {q.status}</p>
+                  <div key={q.id} className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
+                    <div className="flex items-start gap-3">
+                      <Badge tone={TYPE_TONE[q.content_type] ?? "gray"}>{q.content_type}</Badge>
+                      <button
+                        className="min-w-0 flex-1 text-left"
+                        onClick={() => setExpanded(expanded === q.id ? null : q.id)}
+                      >
+                        <p className="truncate text-sm text-zinc-200 hover:text-brand-300">{q.title || "(tanpa judul)"}</p>
+                        <p className="text-xs text-zinc-600">prioritas {q.priority} · {q.status}</p>
+                      </button>
+                      <button
+                        className="rounded-md border border-brand-500/40 px-2 py-1 text-xs text-brand-300 hover:bg-brand-500/10 disabled:opacity-40"
+                        disabled={busy || !ADVANCEABLE[q.status]}
+                        title="Majukan satu tahap pipeline"
+                        onClick={() => onAdvance(q)}
+                      >
+                        Advance →
+                      </button>
                     </div>
-                    <button
-                      className="rounded-md border border-brand-500/40 px-2 py-1 text-xs text-brand-300 hover:bg-brand-500/10 disabled:opacity-40"
-                      disabled={busy || !ADVANCEABLE[q.status]}
-                      title="Majukan satu tahap pipeline"
-                      onClick={() => onAdvance(q)}
-                    >
-                      Advance →
-                    </button>
+                    {expanded === q.id && (
+                      <QueueDetail brief={q.brief} />
+                    )}
                   </div>
                 ))}
               </div>
@@ -207,3 +238,78 @@ export default function CalendarPage() {
     </div>
   );
 }
+
+function QueueDetail({ brief }: { brief: QueueDetailBrief }) {
+  if (!brief || Object.keys(brief).length === 0) {
+    return <p className="mt-2 text-xs text-zinc-600">Detail brief tidak tersedia.</p>;
+  }
+  const outline = brief.script_outline as
+    | Array<{ heading?: string; text?: string; time?: string }>
+    | string
+    | undefined;
+  return (
+    <div className="mt-2 space-y-2 rounded-md bg-zinc-950/70 p-3 text-xs text-zinc-400">
+      {brief.quality_result && (
+        <p className="font-medium text-brand-300">
+          Quality: {brief.quality_result}
+          {brief.quality_score != null && ` (${brief.quality_score}/100)`}
+        </p>
+      )}
+      {brief.audience && <p><span className="text-zinc-500">Audience:</span> {brief.audience}</p>}
+      {brief.duration && <p><span className="text-zinc-500">Durasi:</span> {brief.duration}</p>}
+      {brief.hook && <p><span className="text-zinc-500">Hook:</span> {brief.hook}</p>}
+      {brief.title_variants && brief.title_variants.length > 0 && (
+        <div>
+          <p className="text-zinc-500">Varian judul:</p>
+          <ul className="ml-3 list-disc space-y-0.5">
+            {brief.title_variants.map((t, i) => (
+              <li key={i}>{t}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {brief.thumbnail_concept && (
+        <p><span className="text-zinc-500">Thumbnail:</span> {brief.thumbnail_concept}</p>
+      )}
+      {brief.thumbnail_variants && brief.thumbnail_variants.length > 0 && (
+        <ul className="ml-3 list-disc space-y-0.5">
+          {brief.thumbnail_variants.map((v, i) => (
+            <li key={i}>{v}</li>
+          ))}
+        </ul>
+      )}
+      {brief.keywords && brief.keywords.length > 0 && (
+        <p><span className="text-zinc-500">Keyword:</span> {brief.keywords.join(", ")}</p>
+      )}
+      {brief.script_title && <p><span className="text-zinc-500">Script:</span> {brief.script_title}</p>}
+      {brief.script_hook && <p><span className="text-zinc-500">Script hook:</span> {brief.script_hook}</p>}
+      {Array.isArray(outline) && outline.length > 0 && (
+        <div>
+          <p className="text-zinc-500">Outline script:</p>
+          <ul className="ml-3 list-disc space-y-0.5">
+            {outline.map((s, i) => (
+              <li key={i}>
+                {typeof s === "string" ? s : `${s.heading ?? "Bagian"}${s.time ? ` (${s.time})` : ""}${s.text ? `: ${s.text}` : ""}`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type QueueDetailBrief = {
+  title_variants?: string[];
+  thumbnail_concept?: string;
+  thumbnail_variants?: string[];
+  script_title?: string;
+  script_hook?: string;
+  script_outline?: unknown;
+  keywords?: string[];
+  hook?: string;
+  audience?: string;
+  duration?: string;
+  quality_score?: number | null;
+  quality_result?: string | null;
+};

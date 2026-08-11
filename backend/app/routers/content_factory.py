@@ -79,13 +79,49 @@ def list_ideas(channel_id: str, user: User = Depends(get_current_user),
                        "priority": i.priority, "status": i.status} for i in rows]}
 
 
+def _brief_payload(brief: object) -> dict:
+    if brief is None:
+        return {}
+    tv = brief.title_variants or []
+    titles = [t.get("title") for t in tv if isinstance(t, dict) and t.get("title")] or []
+    th = brief.thumbnail_variants or {}
+    if isinstance(th, dict):
+        concept = th.get("concept", "")
+        variants = th.get("variants", [])
+    else:
+        concept, variants = "", []
+    outline = brief.script_outline or {}
+    keywords = brief.seo_keywords or []
+    if not isinstance(keywords, list):
+        keywords = []
+    return {
+        "title_variants": titles,
+        "thumbnail_concept": concept,
+        "thumbnail_variants": [v.get("concept") or v.get("image_prompt", "") for v in variants if isinstance(v, dict)][:3],
+        "script_title": outline.get("title", ""),
+        "script_hook": outline.get("hook", ""),
+        "script_outline": outline.get("sections", outline.get("steps", [])),
+        "keywords": keywords,
+        "hook": brief.hook or "",
+        "audience": brief.audience or "",
+        "duration": brief.duration or "",
+        "quality_score": brief.quality_score,
+        "quality_result": brief.quality_result,
+    }
+
+
 @router.get("/content-factory/queue")
 def list_queue(channel_id: str, user: User = Depends(get_current_user),
                db: Session = Depends(get_db)) -> dict:
     get_user_channel(db, user, channel_id)
     rows = db.query(ContentQueue).filter_by(channel_id=channel_id).order_by(ContentQueue.created_at.desc()).limit(50).all()
-    return {"items": [{"id": q.id, "title": q.title, "content_type": q.content_type, "status": q.status,
-                       "priority": q.priority, "publish_date": q.publish_date, "notes": q.notes} for q in rows]}
+    items = []
+    for q in rows:
+        brief = db.get(ContentBrief, q.brief_id) if q.brief_id else None
+        items.append({"id": q.id, "title": q.title, "content_type": q.content_type, "status": q.status,
+                      "priority": q.priority, "publish_date": q.publish_date, "notes": q.notes,
+                      "brief": _brief_payload(brief)})
+    return {"items": items}
 
 
 @router.post("/content-factory/queue/{queue_id}/advance")
