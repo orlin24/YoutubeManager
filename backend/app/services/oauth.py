@@ -19,9 +19,10 @@ from app.utils.logging import get_logger
 logger = get_logger("oauth")
 
 SCOPES = [
-    "openid",
-    "email",
-    "profile",
+    # TIDAK sertakan openid/userinfo.email/profile: itu "Google Sign In" yang
+    # WAJIB verifikasi aplikasi oleh Google (hard block disabled_client utk app
+    # unverified, non-owner). Scope YouTube saja => warning "unverified app"
+    # bisa dilewati (Advanced -> Go to app unsafe).
     "https://www.googleapis.com/auth/youtube.readonly",
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube",
