@@ -10,19 +10,12 @@ from app.utils.errors import AppError
 
 
 def user_channel_ids(db: Session, user: User) -> list[str]:
-    rows = (
-        db.query(Channel.id)
-        .join(YouTubeAccount, YouTubeAccount.id == Channel.youtube_account_id)
-        .filter(YouTubeAccount.user_id == user.id)
-        .all()
-    )
+    # Workspace tunggal: semua user melihat SEMUA channel (tidak difilter per user).
+    rows = db.query(Channel.id).all()
     return [r[0] for r in rows]
 
 
 def get_user_channel(db: Session, user: User, channel_id: str) -> Channel:
-    ids = user_channel_ids(db, user)
-    if channel_id not in ids:
-        raise AppError(404, "NOT_FOUND", "Channel not found.")
     channel = db.get(Channel, channel_id)
     if channel is None:
         raise AppError(404, "NOT_FOUND", "Channel not found.")

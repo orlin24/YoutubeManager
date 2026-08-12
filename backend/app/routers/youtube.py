@@ -40,7 +40,6 @@ def status() -> dict:
 def accounts(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     rows = (
         db.query(YouTubeAccount)
-        .filter_by(user_id=user.id)
         .order_by(YouTubeAccount.created_at.desc())
         .all()
     )
@@ -64,7 +63,7 @@ def accounts(user: User = Depends(get_current_user), db: Session = Depends(get_d
 def disconnect(payload: DisconnectRequest, request: Request, user: User = Depends(get_current_user),
                db: Session = Depends(get_db)) -> dict:
     check_csrf(request)
-    account = db.query(YouTubeAccount).filter_by(id=payload.account_id, user_id=user.id).first()
+    account = db.query(YouTubeAccount).filter_by(id=payload.account_id).first()
     if account is None:
         raise AppError(404, "NOT_FOUND", "Account not found.")
     channel = db.query(Channel).filter_by(youtube_account_id=account.id).first()

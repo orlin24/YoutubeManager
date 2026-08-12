@@ -136,7 +136,6 @@ def logout(response: Response) -> dict:
 def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     accounts = (
         db.query(YouTubeAccount)
-        .filter_by(user_id=user.id)
         .order_by(YouTubeAccount.created_at.desc())
         .all()
     )
