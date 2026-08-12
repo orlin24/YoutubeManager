@@ -115,7 +115,7 @@ export default function PlaylistsPage() {
         title="No channel connected"
         description="Connect a YouTube channel to manage playlists."
         action={
-          <a href="/api/auth/google" className="btn-primary">
+          <a href="http://localhost:5000/api/auth/google" className="btn-primary">
             Connect YouTube
           </a>
         }

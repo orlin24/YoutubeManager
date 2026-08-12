@@ -117,7 +117,7 @@ export default function AiAssistantPage() {
         title="Connect a channel first"
         description="The AI works on your connected YouTube channel."
         action={
-          <a href="/api/auth/google" className="btn-primary">
+          <a href="http://localhost:5000/api/auth/google" className="btn-primary">
             Connect YouTube
           </a>
         }

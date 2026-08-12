@@ -32,7 +32,7 @@ export function ChannelSelect() {
 
 export function ConnectChannelButton() {
   return (
-    <a href="/api/auth/google" className="btn-primary">
+    <a href="http://localhost:5000/api/auth/google" className="btn-primary">
       Connect YouTube
     </a>
   );

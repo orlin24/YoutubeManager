@@ -53,7 +53,7 @@ export default function DashboardPage() {
           description="AI YouTube Manager menganalisis channel kamu, membuat content plan, menulis judul dan deskripsi, dan merekomendasikan waktu tayang terbaik."
           action={
             <div className="flex flex-wrap justify-center gap-2">
-              <a href="/api/auth/google" className="btn-primary">
+              <a href="http://localhost:5000/api/auth/google" className="btn-primary">
                 Connect YouTube
               </a>
               <Link to="/tutorial" className="btn-secondary">

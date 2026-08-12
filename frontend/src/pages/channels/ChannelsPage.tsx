@@ -105,7 +105,7 @@ export default function ChannelsPage() {
             Connect your YouTube channels and manage the AI memory for each
           </p>
         </div>
-        <a href="/api/auth/google" className="btn-primary">
+        <a href="http://localhost:5000/api/auth/google" className="btn-primary">
           <Plus className="h-4 w-4" /> Connect YouTube
         </a>
       </div>
@@ -122,7 +122,7 @@ export default function ChannelsPage() {
           title="No channels connected yet"
           description="Connect a YouTube channel to let the AI analyze it and manage your content."
           action={
-            <a href="/api/auth/google" className="btn-primary">
+            <a href="http://localhost:5000/api/auth/google" className="btn-primary">
               Connect YouTube
             </a>
           }

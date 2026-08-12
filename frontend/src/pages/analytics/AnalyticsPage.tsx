@@ -50,7 +50,7 @@ export default function AnalyticsPage() {
         title="No channel connected"
         description="Connect a YouTube channel to see analytics."
         action={
-          <a href="/api/auth/google" className="btn-primary">
+          <a href="http://localhost:5000/api/auth/google" className="btn-primary">
             Connect YouTube
           </a>
         }

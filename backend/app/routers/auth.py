@@ -192,19 +192,27 @@ async def google_callback(request: Request, code: str | None = None, state: str 
     if state != expected_state:
         return RedirectResponse(url=f"{frontend}?error=google_auth_failed", status_code=302)
 
-    # user_id is not carried by the redirect chain; require an authenticated
-    # session. We reuse the access cookie if present.
+    # Workspace tunggal: akun YouTube bersifat GLOBAL (semua user melihatnya),
+    # jadi callback tidak wajib punya sesi aplikasi - user boleh connect dari
+    # Chrome profile mana pun (A/B/C/D) tanpa login dulu. Kalau tidak ada
+    # sesi valid, kaitkan akun ke user utama (tertua) sebagai pemilik audit;
+    # channel tetap terlihat oleh semua user.
     auth_header = request.headers.get("Authorization") or ""
     token = auth_header[7:] if auth_header.lower().startswith("bearer ") else request.cookies.get("aym_access")
-    if not token:
-        return RedirectResponse(url=f"{frontend}?error=google_auth_requires_login", status_code=302)
-    from app.auth.jwt import decode_token
+    user_id = None
+    if token:
+        from app.auth.jwt import decode_token
 
-    try:
-        payload = decode_token(token, expected_type="access")
-    except AppError:
-        return RedirectResponse(url=f"{frontend}?error=google_auth_requires_login", status_code=302)
-    user_id = payload.get("sub")
+        try:
+            payload = decode_token(token, expected_type="access")
+            user_id = payload.get("sub")
+        except AppError:
+            user_id = None
+    if not user_id:
+        primary = db.query(User).order_by(User.created_at.asc()).first()
+        if primary is None:
+            return RedirectResponse(url=f"{frontend}?error=google_auth_requires_login", status_code=302)
+        user_id = primary.id
 
     try:
         await handle_oauth_callback(db, code=code, state=state, expected_state=expected_state, user_id=user_id)

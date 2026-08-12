@@ -173,9 +173,19 @@ export default function LoginPage() {
               {mode === "setup" ? "Buat akun admin" : "Login"}
             </Button>
             {mode === "login" && (
-              <p className="text-center text-xs text-zinc-600">
-                Lupa password? Hubungi admin aplikasi - tidak ada pendaftaran akun baru.
-              </p>
+              <>
+                <p className="text-center text-xs text-zinc-600">
+                  Lupa password? Hubungi admin aplikasi - tidak ada pendaftaran akun baru.
+                </p>
+                <div className="border-t border-zinc-800 pt-3 text-center">
+                  <a
+                    href="http://localhost:5000/api/auth/google"
+                    className="text-xs font-medium text-brand-400 underline underline-offset-2 hover:text-brand-300"
+                  >
+                    Hubungkan channel YouTube langsung (tanpa login)
+                  </a>
+                </div>
+              </>
             )}
           </form>
         )}

@@ -130,7 +130,7 @@ export default function ContentPlanPage() {
         title="No channel connected"
         description="Connect a YouTube channel to build a content plan."
         action={
-          <a href="/api/auth/google" className="btn-primary">
+          <a href="http://localhost:5000/api/auth/google" className="btn-primary">
             Connect YouTube
           </a>
         }

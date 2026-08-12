@@ -323,7 +323,7 @@ AI_BASE_URL=${"https://api.openai.com/v1"}`;
               untuk memilih akun Google kamu dan setujui izinnya:
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <a href="/api/auth/google" className="btn-primary h-9 text-xs">Connect YouTube</a>
+              <a href="http://localhost:5000/api/auth/google" className="btn-primary h-9 text-xs">Connect YouTube</a>
               <a href="/channels" className="btn-ghost h-9 text-xs">Buka halaman Channels</a>
             </div>
             <p className="text-sm text-zinc-400">
