@@ -641,12 +641,13 @@ def sync_channel_data(db: Session, account: YouTubeAccount, *, full: bool = True
             _upsert_video(db, channel, v)
 
     metrics: dict | None = None
+    metric_day: date | None = None
     try:
         aclient = get_analytics_client(db, account)
-        metrics = _fetch_channel_daily_metrics(aclient, channel.channel_id, date.today())
+        metric_day, metrics = _fetch_channel_daily_metrics(aclient, channel.channel_id, date.today())
     except AppError as exc:
-        logger.warning("Channel analytics unavailable, storing zeros: %s", exc.code)
-    _upsert_channel_snapshot(db, channel, metrics)
+        logger.warning("Channel analytics unavailable: %s", exc.code)
+    _upsert_channel_snapshot(db, channel, metrics, metric_day)
     refresh_channel_scores(db, channel.id)  # auto AI scores for every video
     log_audit(db, channel_id=channel.id, action="channel_synced", target=channel.title, result="ok")
     return {
@@ -661,17 +662,19 @@ def sync_channel_data(db: Session, account: YouTubeAccount, *, full: bool = True
 def _upsert_channel_snapshot(db: Session, channel: Channel, metrics: dict | None = None) -> None:
     """Store a daily channel-level analytics snapshot (DAILY DELTAS).
 
-    metrics comes from the YouTube Analytics API for [today-1, today]; when it is
-    unavailable (degraded mode), deltas are stored as 0 - we never fabricate data.
+    metrics comes from the YouTube Analytics API for the most recent FINALIZED
+    day; when no finalized data is available yet we skip writing (never fabricate).
     """
-    today = date.today()
+    if not metrics:
+        return
+    day = day or date.today()
     snapshot = (
         db.query(AnalyticsSnapshot)
-        .filter_by(channel_id=channel.id, video_id=None, date=today)
+        .filter_by(channel_id=channel.id, video_id=None, date=day)
         .first()
     )
     if snapshot is None:
-        snapshot = AnalyticsSnapshot(channel_id=channel.id, video_id=None, date=today)
+        snapshot = AnalyticsSnapshot(channel_id=channel.id, video_id=None, date=day)
         db.add(snapshot)
     m = metrics or {}
     snapshot.views = int(m.get("views", 0) or 0)
@@ -687,8 +690,16 @@ def _upsert_channel_snapshot(db: Session, channel: Channel, metrics: dict | None
     db.commit()
 
 
-def _fetch_channel_daily_metrics(client, channel_id: str, today: date) -> dict:
-    """Channel-level analytics for the last day. Returns {} on failure.
+def _fetch_channel_daily_metrics(
+    client, channel_id: str, today: date
+) -> tuple[date | None, dict]:
+    """Channel-level analytics for the most recent FINALIZED day.
+
+    The Analytics API lags ~1-2 days: queries covering today/yesterday often
+    return no rows, which is why daily snapshots stored zeros. We query
+    [today-2, today] with dimensions=day and take the OLDEST day present - that
+    value is final and safe to store. Returns (metric_day, metrics); when nothing
+    is finalized yet returns (None, {}).
 
     estimatedRevenue needs the restricted yt-analytics-monetary scope, which we no
     longer request (it blocks unverified apps from new sign-ins). Accounts granted
@@ -698,30 +709,40 @@ def _fetch_channel_daily_metrics(client, channel_id: str, today: date) -> dict:
         "views,estimatedMinutesWatched,averageViewDuration,likes,comments,shares,"
         "subscribersGained,subscribersLost,estimatedRevenue"
     )
+    start = (today - timedelta(days=2)).isoformat()
     try:
         resp = safe_call(
             client.reports().query,
             ids=f"channel=={channel_id}",
-            startDate=(today - timedelta(days=1)).isoformat(),
+            startDate=start,
             endDate=today.isoformat(),
             metrics=metrics,
+            dimensions="day",
         )
     except AppError as exc:
-        if exc.code == "YOUTUBE_PERMISSION" and "estimatedRevenue" in metrics:
+        # Accounts without the restricted yt-analytics-monetary scope fail the
+        # revenue-inclusive query (mapped as YOUTUBE_PERMISSION or, empirically,
+        # YOUTUBE_AUTH_EXPIRED). Retry without revenue instead of giving up.
+        if exc.code in ("YOUTUBE_PERMISSION", "YOUTUBE_AUTH_EXPIRED") and "estimatedRevenue" in metrics:
             resp = safe_call(
                 client.reports().query,
                 ids=f"channel=={channel_id}",
-                startDate=(today - timedelta(days=1)).isoformat(),
+                startDate=start,
                 endDate=today.isoformat(),
                 metrics=metrics.replace(",estimatedRevenue", ""),
+                dimensions="day",
             )
         else:
             raise
     rows = resp.get("rows", [])
     if not rows:
-        return {}
+        return None, {}
     cols = [c["name"] for c in resp.get("columnHeaders", [])]
-    return dict(zip(cols, rows[0]))
+    row = dict(zip(cols, rows[0]))  # rows[0] = oldest = finalized day
+    day_raw = row.pop("day", None)
+    if not day_raw:
+        return None, {}
+    return date.fromisoformat(str(day_raw)), row
 
 
 def sync_video_analytics(db: Session, account: YouTubeAccount, video: Video | None = None) -> None:
