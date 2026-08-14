@@ -251,6 +251,43 @@ def test_repeated_success_raises_confidence(db_session):
     assert mem2.confidence > c1, "sukses berulang harus menaikkan confidence"
 
 
+# ---- regression: SQLite (Pi) naive vs aware datetimes -----------------------
+def test_sqlite_naive_datetime_no_crash(db_session):
+    """Pi pakai SQLite -> published_at/created_at/updated_at naive. Aritmetika
+    datetime harus tetap jalan (regresi: 'can't subtract offset-naive and
+    offset-aware datetimes' di /ai/ceo)."""
+    from app.models.channel_profile import ChannelProfile
+
+    ch = _make_channel(db_session)
+    _make_video(db_session, ch, "lama", views=100, days_ago=40, yid="n1")
+    # simulasikan SQLite: published_at naive
+    v = db_session.query(Video).filter(Video.channel_id == ch.id).first()
+    v.published_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=40)
+    db_session.add(ChannelProfile(channel_id=ch.id, upload_cadence_days=1))
+    db_session.commit()
+    # risk_scan (dipanggil scorecard CEO) tidak boleh crash
+    risks = bi_engine.risk_scan(db_session, ch, None)
+    assert any("jadwal" in r.get("category", "").lower() or "upload" in r.get("category", "").lower() for r in risks)
+    # learning: created_at naive + evaluasi tidak boleh crash
+    out = learning_service.record_recommendation(
+        db_session, ch.id, decision="Uji tz", evidence="x", sample_size=2,
+        confidence="LOW", expected_outcome="2x", expected_value=5000.0,
+    )
+    out.created_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=20)
+    _make_video(db_session, ch, "hasil uji", views=50, days_ago=5, yid="n2")
+    db_session.commit()
+    res = learning_service.evaluate_outcomes(db_session)
+    assert res["evaluated"] >= 1
+    # decay dengan updated_at naive tidak boleh crash
+    db_session.add(LearningMemory(
+        channel_id=ch.id, kind="WINNING_PATTERN", pattern="pola lama", sample_size=5,
+        confidence=60.0, performance="x",
+        updated_at=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=40),
+    ))
+    db_session.commit()
+    learning_service._apply_decay_to_patterns(db_session)
+
+
 # ---- learning dashboard endpoint -------------------------------------------
 def test_learning_endpoints_smoke(client):
     r1 = client.get("/api/learning/stats")

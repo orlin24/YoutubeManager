@@ -29,6 +29,19 @@ SUCCESS_FACTOR = 1.0  # actual >= expected*1.0 -> success
 FAILURE_FACTOR = 0.6  # actual < expected*0.6 -> failure
 
 
+def _naive(dt: datetime | None) -> datetime | None:
+    """SQLite (Pi) stores/returns naive datetimes; Postgres (dev) returns aware.
+    Normalize before any Python-side datetime arithmetic."""
+    if dt is None or dt.tzinfo is None:
+        return dt
+    return dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _utcnow() -> datetime:
+    """Naive-UTC now, safe to subtract from DB datetimes on both DBs."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 def record_recommendation(
     db: Session,
     channel_id: str,
@@ -65,7 +78,7 @@ def _recent_actual_views(db: Session, channel_id: str, since: datetime) -> float
 
     rows = (
         db.query(Video.view_count)
-        .filter(Video.channel_id == channel_id, Video.published_at >= since)
+        .filter(Video.channel_id == channel_id, Video.published_at >= _naive(since))
         .all()
     )
     values = sorted(v for (v,) in rows if v is not None)
@@ -88,7 +101,7 @@ def _update_pattern_memory(
     # baseline = performa channel SEBELUM rekomendasi (hindari kontaminasi hasil)
     baseline = (
         db.query(Video.view_count)
-        .filter(Video.channel_id == channel_id, Video.published_at < outcome.created_at)
+        .filter(Video.channel_id == channel_id, Video.published_at < _naive(outcome.created_at))
         .all()
     )
     base_values = sorted(v for (v,) in baseline if v is not None)
@@ -117,7 +130,7 @@ def _update_pattern_memory(
         existing.sample_size += outcome.sample_size or 1
         existing.performance = performance
         existing.kind = kind
-        existing.updated_at = datetime.now(timezone.utc)
+        existing.updated_at = _utcnow()
         new_conf = existing.confidence
         if success:
             new_conf = min(95.0, existing.confidence + 8 + (outcome.sample_size or 1) * 2)
@@ -127,7 +140,7 @@ def _update_pattern_memory(
         existing.data = {
             **(existing.data or {}),
             "history": (existing.data or {}).get("history", []) + [
-                {"at": datetime.now(timezone.utc).isoformat(), "actual": actual,
+                {"at": _utcnow().isoformat(), "actual": actual,
                  "success": success, "confidence_before": before_conf, "confidence_after": round(new_conf, 1)}
             ],
         }
@@ -141,7 +154,7 @@ def _update_pattern_memory(
             sample_size=outcome.sample_size or 1,
             confidence=35.0 if success else 15.0,
             performance=performance,
-            data={"history": [{"at": datetime.now(timezone.utc).isoformat(), "actual": actual,
+            data={"history": [{"at": _utcnow().isoformat(), "actual": actual,
                               "success": success, "confidence_before": before_conf,
                               "confidence_after": 35.0 if success else 15.0}]},
         )
@@ -167,7 +180,7 @@ def evaluate_outcomes(db: Session, eval_days: int = EVAL_PERIOD_DAYS) -> dict:
     from app.models.channel import Channel
     from app.models.learning import LearningMemory
 
-    now = datetime.now(timezone.utc)
+    now = _utcnow()
     cutoff = now - timedelta(days=eval_days)
     pending = (
         db.query(RecommendationOutcome)
@@ -180,7 +193,7 @@ def evaluate_outcomes(db: Session, eval_days: int = EVAL_PERIOD_DAYS) -> dict:
         actual = _recent_actual_views(db, out.channel_id, out.created_at)
         if actual is None:
             # no new video yet; keep waiting but do not block forever
-            if (now - out.created_at).days > eval_days * 3:
+            if (now - (_naive(out.created_at) or now)).days > eval_days * 3:
                 out.status = "evaluated"
                 out.actual_outcome = "Tidak ada data hasil (belum ada video baru)."
                 out.evaluated_at = now
@@ -252,14 +265,15 @@ def _apply_decay_to_patterns(db: Session) -> None:
     confidence over time (HIGH -> MEDIUM -> LOW), but evidence is kept."""
     from app.models.channel import Channel
 
-    now = datetime.now(timezone.utc)
+    now = _utcnow()
     rows = (
         db.query(LearningMemory)
         .filter(LearningMemory.kind.in_(("WINNING_PATTERN", "EXPERIMENT_RESULT")))
         .all()
     )
     for m in rows:
-        age = (now - (m.updated_at or m.created_at)).days
+        last_ts = _naive(m.updated_at) or _naive(m.created_at) or now
+        age = (now - last_ts).days
         if age <= 14:
             continue
         new = decay_confidence(m.confidence, age)

@@ -352,7 +352,9 @@ def risk_scan(db: Session, channel: Channel, lc: ChannelLifecycle | None) -> lis
                                                    Video.published_at.isnot(None)) \
             .order_by(Video.published_at.desc()).first()
         if last and last[0]:
-            days_since = (datetime.now(timezone.utc) - last[0]).days
+            # SQLite (Pi) returns naive datetimes - normalize before subtracting
+            last_dt = last[0].replace(tzinfo=None) if last[0].tzinfo else last[0]
+            days_since = (datetime.now(timezone.utc).replace(tzinfo=None) - last_dt).days
             if days_since > profile.upload_cadence_days * 2:
                 out.append({"category": "Jadwal upload", "severity": "MEDIUM",
                             "title": "Keteraturan upload menurun",
