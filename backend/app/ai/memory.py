@@ -164,9 +164,21 @@ def build_context(
         "recent_videos": videos_out,
         "recent_comments": get_recent_comments(db, channel, limit=8) if include_comments else [],
         "traffic_sources": get_traffic_sources(db, channel) if include_traffic else [],
+        "learning_memory": _learning_memory(db, channel.id),
         "user_instruction": instruction,
         "today": today.isoformat(),
     }
+
+
+def _learning_memory(db: Session, channel_id: str) -> dict:
+    """Learning memory injected into AI context (audit #17, #18). Keeps AI from
+    repeating failed patterns and reuses proven ones; empty when nothing learned."""
+    try:
+        from app.services.learning_service import get_memory_context
+
+        return get_memory_context(db, channel_id)
+    except Exception:  # noqa: BLE001 - never break AI chat because of memory
+        return {"has_memory": False, "note": "Memori pembelajaran tidak tersedia."}
 
 
 def require_channel(db: Session, channel_id: str) -> Channel:

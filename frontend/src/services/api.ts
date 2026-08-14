@@ -445,7 +445,7 @@ export const fetchChannelPatterns = (channelId: string) =>
   );
 export const fetchPortfolio = () => api.get<PortfolioOverview>("/portfolio/overview");
 export const fetchPortfolioPriorities = () =>
-  api.get<{ items: Array<{ channel_id: string; channel_title: string; mode: string; priority: string; title: string; reason: string }> }>(
+  api.get<{ items: Array<{ channel_id: string; channel_title: string; mode: string; priority: string; priority_score?: number; confidence?: string; title: string; reason: string }> }>(
     "/portfolio/priorities"
   );
 
@@ -534,8 +534,14 @@ export const fetchCeoOpportunities = () => api.get<{ items: Array<{ channel: str
 export const fetchCeoRisks = () => api.get<{ items: Array<{ channel: string; level: string; title: string }> }>("/ceo/risks");
 export const fetchCeoRecommendation = () => api.get<{ channel: string; decision: string; reason: string; confidence: string }>("/ceo/recommendation");
 export const fetchCeoAllocation = () => api.get<{ items: Array<{ channel: string; mode: string; share: number }> }>("/ceo/allocation");
+export interface PortfolioScore {
+  total: number | null;
+  breakdown: { HEALTH: number | null; GROWTH: number | null; RISK: number | null; OPPORTUNITY: number | null; EXPERIMENTATION: number | null };
+  note: string;
+  channel_modes: Record<string, string>;
+}
 export const fetchCeoScorecard = () =>
-  api.get<{ portfolio_health: number | null; growth: number | null; revenue: number | null; content_efficiency: number | null; experimentation: number | null; risk: string }>("/ceo/scorecard");
+  api.get<{ portfolio_health: number | null; growth: number | null; revenue: number | null; content_efficiency: number | null; experimentation: number | null; risk: string; portfolio_score: PortfolioScore }>("/ceo/scorecard");
 export const sendCeoTelegram = () => api.post<{ success: boolean; message: string }>("/ceo/telegram");
 
 // ---- business intelligence ----
@@ -547,3 +553,55 @@ export const simulateBi = (payload: { name: string; uploads_per_week?: number | 
 export const fetchBiStrategy = () => api.get<{ items: Array<{ question: string; answer: string }> }>("/bi/strategy");
 export const fetchBiAccuracy = () =>
   api.get<{ status: string; count: number; mape_pct?: number; bias_pct?: number; model_version?: string }>("/bi/accuracy");
+
+// ---- automatic learning (audit #16-#21, #25) ----
+export interface LearningStats {
+  videos_analyzed: number;
+  proven_patterns: number;
+  testing_patterns: number;
+  failed_patterns: number;
+  active_experiments: number;
+  new_insights: number;
+  strategy_version: number;
+  last_learned: string | null;
+  recent_memory: Array<{
+    kind: string;
+    pattern: string;
+    confidence: number;
+    performance: string;
+    updated_at: string | null;
+  }>;
+}
+
+export interface LearningMemoryRow {
+  id: string;
+  channel_id: string;
+  kind: string;
+  pattern: string;
+  evidence: string;
+  sample_size: number;
+  confidence: number;
+  performance: string;
+  updated_at: string | null;
+}
+
+export interface LearningOutcomeRow {
+  id: string;
+  channel_id: string;
+  decision: string;
+  evidence: string;
+  sample_size: number;
+  confidence: string;
+  expected_outcome: string;
+  expected_value: number | null;
+  status: string;
+  actual_value: number | null;
+  actual_outcome: string;
+  created_at: string | null;
+  evaluated_at: string | null;
+}
+
+export const fetchLearningStats = () => api.get<LearningStats>("/learning/stats");
+export const fetchLearningMemory = () => api.get<LearningMemoryRow[]>("/learning/memory");
+export const fetchLearningOutcomes = () => api.get<LearningOutcomeRow[]>("/learning/outcomes");
+export const evaluateLearning = () => api.post<{ evaluated: number; updated: number; pending_left: number }>("/learning/evaluate");

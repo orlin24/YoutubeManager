@@ -150,6 +150,12 @@ def _run_bi_daily() -> None:
         bi_engine.compute_snapshot(db)
         bi_engine.forecast_accuracy(db)
         bi_engine.morning_report(db)
+        # automatic learning (audit #16, #19): expected vs actual + confidence decay
+        from app.services import learning_service
+
+        result = learning_service.evaluate_outcomes(db)
+        if result.get("evaluated"):
+            logger.info("AI learning: %s", result)
         logger.info("BI daily job done")
     except Exception as exc:  # noqa: BLE001
         logger.error("BI daily job failed", exc_info=exc)

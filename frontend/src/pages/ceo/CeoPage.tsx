@@ -99,7 +99,7 @@ export default function CeoPage() {
   const rk = (data.rk as Array<{ channel: string; level: string; title: string }>) ?? [];
   const rec = data.rec as { channel?: string; decision?: string; reason?: string; confidence?: string } | undefined;
   const alloc = (data.alloc as Array<{ channel: string; mode: string; share: number }>) ?? [];
-  const sc = data.sc as { portfolio_health?: number | null; growth?: number | null; revenue?: number | null; content_efficiency?: number | null; experimentation?: number | null; risk?: string } | undefined;
+  const sc = data.sc as { portfolio_health?: number | null; growth?: number | null; revenue?: number | null; content_efficiency?: number | null; experimentation?: number | null; risk?: string; portfolio_score?: { total?: number | null; breakdown?: { HEALTH?: number | null; GROWTH?: number | null; RISK?: number | null; OPPORTUNITY?: number | null; EXPERIMENTATION?: number | null }; note?: string } } | undefined;
 
   const onSend = async () => {
     setBusy(true);
@@ -232,6 +232,27 @@ export default function CeoPage() {
                 <div className="rounded-lg bg-zinc-900 p-3"><p className="text-xs text-zinc-500">Eksperimen</p><p className="text-lg font-semibold text-violet-400">{sc?.experimentation ?? "-"}</p></div>
                 <div className="rounded-lg bg-zinc-900 p-3"><p className="text-xs text-zinc-500">Risiko</p><p className="text-lg font-semibold text-red-400">{sc?.risk ?? "-"}</p></div>
               </div>
+              {sc?.portfolio_score && (
+                <>
+                  <div className="mt-3 flex items-end gap-2 border-t border-zinc-800 pt-3">
+                    <p className="text-2xl font-bold text-zinc-100">{sc.portfolio_score.total ?? "-"}</p>
+                    <p className="pb-0.5 text-[11px] text-zinc-500">Skor portfolio (detail) · {sc.portfolio_score.note ?? ""}</p>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-sm md:grid-cols-5">
+                    {(
+                      [
+                        ["HEALTH", "Kesehatan"], ["GROWTH", "Pertumbuhan"], ["RISK", "Risiko"],
+                        ["OPPORTUNITY", "Peluang"], ["EXPERIMENTATION", "Eksperimen"],
+                      ] as const
+                    ).map(([k, label]) => (
+                      <div key={k} className="rounded-lg bg-zinc-900 p-2">
+                        <p className="text-[10px] uppercase tracking-wide text-zinc-500">{label}</p>
+                        <p className="text-base font-semibold text-zinc-100">{sc.portfolio_score.breakdown?.[k] ?? "-"}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </Card>
           </div>
 

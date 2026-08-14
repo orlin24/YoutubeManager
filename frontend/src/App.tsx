@@ -18,6 +18,7 @@ const AnalyticsPage = lazy(() => import("./pages/analytics/AnalyticsPage"));
 const ContentPlanPage = lazy(() => import("./pages/content-plan/ContentPlanPage"));
 const AiAssistantPage = lazy(() => import("./pages/ai/AiAssistantPage"));
 const AutonomousPage = lazy(() => import("./pages/ai/AutonomousPage"));
+const LearningPage = lazy(() => import("./pages/learning/LearningPage"));
 const CommentsPage = lazy(() => import("./pages/comments/CommentsPage"));
 const PlaylistsPage = lazy(() => import("./pages/playlists/PlaylistsPage"));
 const AuditPage = lazy(() => import("./pages/audit/AuditPage"));
@@ -86,6 +87,7 @@ export default function App() {
           <Route path="/content-plan" element={<ContentPlanPage />} />
           <Route path="/ai" element={<AiAssistantPage />} />
           <Route path="/ai/autonomous" element={<AutonomousPage />} />
+          <Route path="/ai/learning" element={<LearningPage />} />
           <Route path="/comments" element={<CommentsPage />} />
           <Route path="/playlists" element={<PlaylistsPage />} />
           <Route path="/audit" element={<AuditPage />} />

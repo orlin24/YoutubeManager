@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { ChannelSelect } from "../components/channel/ChannelSelect";
 import { useAuthStore } from "../stores/auth";
-import { CalendarDays, Crown, Layers } from "lucide-react";
+import { Brain, CalendarDays, Crown, Layers } from "lucide-react";
 import { useChannelStore } from "../stores/channel";
 import { fetchHealth } from "../services/api";
 import type { HealthCheck } from "../types";
@@ -36,6 +36,7 @@ const NAV = [
   { to: "/content-plan", label: "Content Plan", icon: CalendarRange },
   { to: "/ai", label: "AI Assistant", icon: Bot },
   { to: "/ai/autonomous", label: "AI Autonom", icon: Cpu },
+  { to: "/ai/learning", label: "AI Learning", icon: Brain },
   { to: "/comments", label: "Comments", icon: MessagesSquare },
   { to: "/playlists", label: "Playlists", icon: ListVideo },
   { to: "/audit", label: "Audit Logs", icon: ScrollText },

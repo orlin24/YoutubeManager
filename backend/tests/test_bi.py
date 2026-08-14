@@ -71,16 +71,23 @@ def test_forecast_saves_history(db_session):
 def test_risk_and_opportunity_scan(db_session):
     ch = _seed(db_session, [(100, i) for i in range(10)])
     lc = ChannelLifecycle(channel_id=ch.id, mode="RECOVERY", objective="x", health_score=30,
-                          growth_pct=-50.0, data={"risk": {"level": "HIGH", "reason": "duplikat"},
+                          growth_pct=-50.0, data={"risk": {"level": "HIGH", "reason": "duplikat",
+                                                           "category": "REPETITIVE_CONTENT_RISK",
+                                                           "risk_score": 60.0, "severity": "HIGH",
+                                                           "confidence": "MEDIUM", "sample_size": 10,
+                                                           "evidence": "5 video mirip"},
                                                   "winners": [{"category": "VIEW WINNER", "title": "W",
+                                                               "pattern_status": "PROVEN",
                                                                "confidence": "HIGH", "data": {"views": 5000},
-                                                               "note": "pemenang"}],
+                                                               "note": "pemenang",
+                                                               "baseline": {"median": 100, "sample_size": 10}}],
                                                   "priorities": []})
     db_session.add(lc)
     db_session.commit()
     risks = bi_engine.risk_scan(db_session, ch, lc)
-    assert any(r["severity"] == "CRITICAL" for r in risks)  # duplicate titles
-    assert any(r["severity"] == "HIGH" for r in risks)  # recovery
+    # audit #1/#3: HIGH similarity risk must NOT auto-escalate to CRITICAL
+    assert not any(r["severity"] == "CRITICAL" for r in risks)
+    assert any(r["severity"] == "HIGH" for r in risks)  # recovery + content risk
     opps = bi_engine.opportunity_scan(db_session, ch, lc)
     assert opps and opps[0]["category"] == "Winning Formula"
 

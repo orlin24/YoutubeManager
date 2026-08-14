@@ -64,31 +64,44 @@ def ceo_overview(db: Session, channel_ids: list[str]) -> dict[str, Any]:
 
 
 def today_priorities(db: Session, channel_ids: list[str]) -> list[dict[str, Any]]:
-    """Max 5 priorities from lifecycle risks/priorities + queue + approvals."""
+    """Max 5 priorities, ranked by evidence (audit #13, #14, #15).
+
+    Every item carries the internal priority_score (Impact + Confidence +
+    Urgency + Evidence - Effort) computed by the risk engine, so the ranking
+    reflects evidence, not noise. CRITICAL/HIGH counts are already normalized.
+    """
+    from app.services import risk_engine
+
     lc_map = _lcs(db, channel_ids)
     items: list[dict[str, Any]] = []
     for cid, lc in lc_map.items():
         ch = db.get(Channel, cid)
-        for p in (lc.data or {}).get("priorities", [])[:2]:
-            items.append({"channel": ch.title if ch else cid, "priority": p.get("priority", "LOW"),
-                          "title": p.get("title", ""), "reason": p.get("reason", "")})
+        for p in (lc.data or {}).get("priorities", [])[:3]:
+            items.append({"channel": ch.title if ch else cid,
+                          "priority": p.get("priority", "LOW"),
+                          "priority_score": p.get("priority_score", 30),
+                          "title": p.get("title", ""), "reason": p.get("reason", ""),
+                          "confidence": p.get("confidence", "LOW"),
+                          "sample_size": p.get("sample_size", 0)})
     if channel_ids:
         waiting = (db.query(ApprovalRequest)
                    .filter(ApprovalRequest.channel_id.in_(channel_ids),
                            ApprovalRequest.status == "pending").count())
         if waiting:
-            items.append({"channel": "System", "priority": "HIGH",
+            items.append({"channel": "System", "priority": "HIGH", "priority_score": 70,
                           "title": f"{waiting} aksi menunggu persetujuan Anda",
-                          "reason": "Tinjau di halaman Approvals."})
+                          "reason": "Tinjau aksi yang menunggu persetujuan.",
+                          "confidence": "HIGH", "sample_size": waiting})
         queue_low = db.query(ContentQueue).filter(
             ContentQueue.channel_id.in_(channel_ids),
             ContentQueue.status.in_(("READY", "QUALITY_CHECK", "PRODUCTION", "UPLOAD_QUEUE"))).count()
         if queue_low < 3:
-            items.append({"channel": "System", "priority": "MEDIUM",
+            items.append({"channel": "System", "priority": "MEDIUM", "priority_score": 45,
                           "title": "Content queue menipis",
-                          "reason": "Buat ide/brief baru untuk minggu depan."})
-    order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
-    items.sort(key=lambda x: order.get(x["priority"], 9))
+                          "reason": "Buat ide/brief baru untuk minggu depan.",
+                          "confidence": "MEDIUM", "sample_size": queue_low})
+    # rank by evidence-backed score, then normalize the labels
+    items = risk_engine.normalize_priorities(items, max_critical=1, max_high=3)
     return items[:5]
 
 
@@ -99,10 +112,15 @@ def opportunities(db: Session, channel_ids: list[str]) -> list[dict[str, Any]]:
         ch = db.get(Channel, cid)
         winners = (lc.data or {}).get("winners", [])
         for w in winners:
-            if w.get("category") in ("VIEW WINNER", "EMERGING WINNER"):
+            # audit #7/#21: OUTLIER (1 video viral) is NOT an opportunity
+            if w.get("category") == "VIEW WINNER" and w.get("pattern_status") == "OUTLIER":
+                continue
+            if w.get("category") in ("VIEW WINNER", "EMERGING WINNER", "CTR_WINNER", "RETENTION_WINNER"):
                 out.append({"channel": ch.title if ch else cid, "type": w["category"],
+                            "pattern_status": w.get("pattern_status", "INCONCLUSIVE"),
                             "title": w.get("title", ""), "confidence": w.get("confidence", "LOW"),
-                            "data": w.get("data", {})})
+                            "note": w.get("note", ""), "data": w.get("data", {}),
+                            "baseline": w.get("baseline", {})})
     return out[:6]
 
 
@@ -111,10 +129,14 @@ def risks(db: Session, channel_ids: list[str]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for cid, lc in lc_map.items():
         ch = db.get(Channel, cid)
-        risk = (lc.data or {}).get("risk", {})
-        if risk.get("level") in ("MEDIUM", "HIGH"):
-            out.append({"channel": ch.title if ch else cid, "level": risk["level"],
-                        "title": risk.get("reason", "")})
+        for r in (lc.data or {}).get("risks", []):
+            sev = r.get("severity") or r.get("level")
+            if sev in ("MEDIUM", "HIGH", "CRITICAL"):
+                out.append({"channel": ch.title if ch else cid, "level": sev,
+                            "category": r.get("category_label") or r.get("category", ""),
+                            "title": r.get("reason", ""),
+                            "confidence": r.get("confidence", "INSUFFICIENT_DATA"),
+                            "sample_size": r.get("sample_size", 0)})
     return out[:6]
 
 
@@ -137,8 +159,10 @@ def recommendation(db: Session, channel_ids: list[str]) -> dict[str, Any]:
         if best is None or score > best[3]:
             best = (name, decision, reason, score)
     if best is None:
-        return {"recommendation": "N/A", "reason": "Belum ada data channel."}
-    return {"channel": best[0], "decision": best[1], "reason": best[2], "confidence": "MEDIUM"}
+        return {"recommendation": "N/A", "reason": "Belum ada data channel.", "confidence": "INSUFFICIENT_DATA"}
+    conf = "HIGH" if best[3] >= 85 else ("MEDIUM" if best[3] >= 70 else "LOW")
+    return {"channel": best[0], "decision": best[1], "reason": best[2],
+            "confidence": conf, "evidence": best[2], "score": best[3]}
 
 
 def allocation(db: Session, channel_ids: list[str]) -> list[dict[str, Any]]:
@@ -166,7 +190,12 @@ def scorecard(db: Session, channel_ids: list[str]) -> dict[str, Any]:
     growth = sum(growths) / len(growths) if growths else None
     revenue_known = [r for r in rows if (r.data or {}).get("kpis", {}).get("estimated_revenue") is not None]
     high_risk = sum(1 for r in rows if (r.data or {}).get("risk", {}).get("level") == "HIGH")
-    # internal heuristics, clearly not official metrics
+    # audit #23: portfolio score with explicit breakdown
+    from app.services import bi_engine
+
+    channels = [db.get(Channel, cid) for cid in channel_ids if db.get(Channel, cid)]
+    ps = bi_engine.portfolio_score(db, channels, lc_map, bi_engine.risk_scan_all(db, channel_ids),
+                                   bi_engine.opportunity_scan_all(db, channel_ids))
     return {
         "portfolio_health": round(min(99, max(5, health)), 1),
         "growth": round(growth, 1) if growth is not None else None,
@@ -175,7 +204,15 @@ def scorecard(db: Session, channel_ids: list[str]) -> dict[str, Any]:
         "content_efficiency": None,  # needs production cost data (rule #43)
         "experimentation": round(sum(1 for r in rows if (r.data or {}).get("winners")) / len(rows) * 100, 1),
         "risk": "LOW" if high_risk == 0 else ("MEDIUM" if high_risk <= 2 else "HIGH"),
+        "portfolio_score": ps,
     }
+
+
+def learning_summary(db: Session, channel_ids: list[str]) -> dict[str, Any]:
+    """Automatic learning dashboard data (audit #25)."""
+    from app.services.learning_service import learning_stats
+
+    return learning_stats(db, channel_ids or None)
 
 
 def telegram_ceo_report(db: Session, channel_ids: list[str]) -> str | None:

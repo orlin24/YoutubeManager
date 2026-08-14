@@ -474,18 +474,47 @@ def generate_content_patterns(db: Session, channel: Channel, days: int = 28) -> 
     traffic = get_traffic_sources(db, channel, days)
     traffic_rows = [{"label": t["label"], "views": t["views"], "percent": t["percent"]} for t in traffic]
 
+    # baseline (audit #8): median views channel-wide so claims compare to reality
+    all_views = [v.view_count for v in db.query(Video).filter(Video.channel_id == channel.id) if v.view_count]
+    all_views.sort()
+    median_views = (
+        all_views[len(all_views) // 2]
+        if all_views and len(all_views) % 2
+        else ((all_views[len(all_views) // 2 - 1] + all_views[len(all_views) // 2]) / 2.0 if len(all_views) >= 2 else (all_views[0] if all_views else 0))
+    )
+    total_videos = len(all_views)
+    # pattern repetition: how many top videos share a title prefix (audit #7)
+    from collections import Counter
+
+    prefix_counts = Counter((v.title or "").strip().lower()[:20] for v in videos if v.title)
+    top_count = max(prefix_counts.values(), default=1)
+    pattern_status = (
+        "PROVEN" if total_videos >= 10 and top_count >= 10 and median_views and (videos[0].view_count or 0) >= median_views * 2
+        else "PROMISING" if top_count >= 3 and median_views and (videos[0].view_count or 0) >= median_views * 1.5
+        else "OUTLIER" if median_views and (videos[0].view_count or 0) >= median_views * 1.5
+        else "INCONCLUSIVE"
+    )
+    confidence = {"PROVEN": "HIGH", "PROMISING": "MEDIUM", "OUTLIER": "LOW", "INCONCLUSIVE": "LOW"}[pattern_status]
+
     provider = get_provider()
     system_prompt = load_system_prompt("content_strategist")
     user_prompt = (
-        "TUGAS: Analisis pola judul yang TERBUKTI berhasil dari data channel ini.\n"
+        "TUGAS: Analisis pola judul dari data channel ini dengan hati-hati.\n"
         "Gunakan data 'PENAYANGAN MENURUT KONTEN' (video + views) dan "
         "'PENAYANGAN MENURUT SUMBER TRAFFIC' (terutama Rekomendasi video) untuk "
-        "menemukan pola judul/deskripsi apa yang mendorong views.\n\n"
+        "menemukan pola judul/deskripsi yang layak DIUJI.\n"
+        "PENTING (audit #21): SATU video viral BUKAN pola terbukti. "
+        "Jangan pernah menulis 'video ini pasti berhasil'; tulis 'pola ini outperform baseline "
+        "dan layak dijadikan kandidat eksperimen'. Sebutkan ekspektasi realistis.\n\n"
+        f"BASELINE CHANNEL: median views {median_views:.0f} dari {total_videos} video. "
+        f"Tingkat pengulangan pola judul: {top_count} video dari 10 teratas. "
+        f"Status pola: {pattern_status} (confidence {confidence}).\n\n"
         f"PENAYANGAN MENURUT KONTEN (video dengan views tertinggi):\n{json.dumps(video_rows, ensure_ascii=False)}\n\n"
         f"PENAYANGAN MENURUT SUMBER TRAFFIC ({days} hari):\n{json.dumps(traffic_rows, ensure_ascii=False)}\n\n"
-        "Buat TEPAT 3 rekomendasi judul + deskripsi yang mengikuti pola terbukti itu. "
+        "Buat TEPAT 3 rekomendasi judul + deskripsi sebagai KANDIDAT EKSPERIMEN. "
         "Setiap rekomendasi WAJIB berisi field 'reason' yang mengutip video nyata di atas "
-        "(misal: 'karena judul \"X\" mendapat Y views lewat rekomendasi video, polanya adalah...'). "
+        "(misal: 'karena judul \"X\" mendapat Y views lewat rekomendasi video, polanya adalah...') "
+        "dan membandingkannya dengan median channel. "
         "Jangan mengarang angka di luar data yang diberikan. Kalau data belum cukup, katakan di 'analysis'.\n"
         "Respond strict JSON: {analysis, recommendations: [{title, description, target_keyword, reason}]} "
         "dalam Bahasa Indonesia."
@@ -534,5 +563,34 @@ def generate_content_patterns(db: Session, channel: Channel, days: int = 28) -> 
             }
         )
     db.commit()
+
+    # automatic learning: record the recommendation so expected vs actual can be
+    # compared later and confidence adjusted (audit #16). Expected value = 2x
+    # channel median views - a realistic experiment target, not a promise.
+    if saved and median_views:
+        try:
+            from app.services.learning_service import record_recommendation
+
+            expected_value = median_views * 2.0
+            record_recommendation(
+                db, channel.id,
+                decision=f"Uji pola judul: {saved[0]['title'][:80]}",
+                reason=analysis[:300],
+                evidence=f"Status pola {pattern_status}; median channel {median_views:.0f} views; {top_count} video teratas berbagi pola judul.",
+                sample_size=total_videos,
+                confidence=confidence,
+                expected_outcome=f"Views >= 2x median channel ({expected_value:.0f})",
+                expected_value=expected_value,
+            )
+        except Exception as exc:  # noqa: BLE001 - learning must never break pattern generation
+            logger.warning("record_recommendation failed: %s", exc)
+
     logger.info("Saved %d content pattern item(s) for channel %s", len(saved), channel.channel_id)
-    return {"analysis": analysis, "recommendations": recs, "saved": saved}
+    return {
+        "analysis": analysis,
+        "recommendations": recs,
+        "saved": saved,
+        "pattern_status": pattern_status,
+        "confidence": confidence,
+        "baseline": {"median": round(median_views, 1), "sample_size": total_videos},
+    }

@@ -44,6 +44,7 @@ def _register_routers(app: FastAPI) -> None:
         content_plan,
         dashboard,
         health,
+        learning,
         lifecycle,
         playlists,
         settings,
@@ -71,6 +72,7 @@ def _register_routers(app: FastAPI) -> None:
     api.include_router(backup.router, prefix="/api")
     api.include_router(bi.router, prefix="/api")
     api.include_router(lifecycle.router, prefix="/api")
+    api.include_router(learning.router, prefix="/api")
 
 
 def create_app() -> FastAPI:

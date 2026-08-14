@@ -38,6 +38,7 @@ from app.models.content_factory import (
     ContentPerformance, ContentQueue,
 )
 from app.models.bi import ForecastHistory
+from app.models.learning import LearningMemory, RecommendationOutcome
 from app.models.lifecycle import AiPattern, ChannelLifecycle
 from app.models.replied_comment import RepliedComment
 from app.models.user import User
@@ -66,6 +67,8 @@ TABLE_ORDER: list[tuple[str, Any]] = [
     ("content_performance", ContentPerformance),
     ("content_generation_logs", ContentGenerationLog),
     ("forecast_history", ForecastHistory),
+    ("learning_memories", LearningMemory),
+    ("recommendation_outcomes", RecommendationOutcome),
     ("replied_comments", RepliedComment),
     ("channel_profiles", ChannelProfile),
     ("videos", Video),

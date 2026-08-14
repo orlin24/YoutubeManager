@@ -13,6 +13,7 @@ from app.models.content_factory import (
     ContentPerformance, ContentQueue,
 )
 from app.models.bi import ForecastHistory
+from app.models.learning import LearningMemory, RecommendationOutcome
 from app.models.lifecycle import AiPattern, ChannelLifecycle
 from app.models.replied_comment import RepliedComment
 from app.models.user import User

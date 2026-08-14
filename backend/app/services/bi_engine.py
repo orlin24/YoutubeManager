@@ -21,6 +21,7 @@ from app.models.bi import ForecastHistory
 from app.models.channel import Channel
 from app.models.lifecycle import ChannelLifecycle
 from app.models.video import Video
+from app.services.confidence_engine import data_quality_score, level_from_score
 from app.utils.logging import get_logger
 
 logger = get_logger("bi")
@@ -207,9 +208,30 @@ def forecast(db: Session, channel_id: str, metric: str, horizon_days: int = 30,
              "confidence": f["confidence"]}
     if save:
         _save_forecast(db, channel_id, metric, horizon_days, f, a)
+    dq = data_quality_score(len(s), recency_days=7, historical_depth_days=len(s),
+                            volatility=a.get("volatility", 0.0))
     return {"metric": metric, "status": "OK", "trend": a["trend"],
             "change_pct": a["change_pct"], "sample_size": a["sample_size"],
-            "forecast": f, "model_version": MODEL_VERSION}
+            "forecast": f, "model_version": MODEL_VERSION,
+            "data_quality": dq,
+            "interpretation": _forecast_interpretation(a, f, dq)}
+
+
+def _forecast_interpretation(a: dict, f: dict, dq: dict) -> str:
+    """Human-friendly forecast interpretation (audit #10, #22, #24).
+
+    A forecast is an estimate with a range, never a promise.
+    """
+    conf = (f or {}).get("confidence") or a.get("confidence")
+    if dq.get("level") in ("INSUFFICIENT", "POOR") or (a.get("sample_size") or 0) < 7:
+        return ("Data belum cukup untuk prediksi yang meyakinkan. Angka ini hanyalah "
+                "perkiraan kasar; jangan dijadikan dasar keputusan besar.")
+    if conf and conf < 40:
+        return (f"Perkiraan statistik dengan keyakinan rendah ({conf:.0f}/100) karena data "
+                "belum stabil. Gunakan rentang atas-bawah, bukan angka tunggal.")
+    return (f"Perkiraan statistik (bukan kepastian): nilai tengah {f['expected']:.0f}, "
+            f"rentang {f['lower']:.0f}-{f['upper']:.0f}. Keyakinan {conf:.0f}/100 berdasarkan "
+            "data yang tersedia.")
 
 
 def _save_forecast(db: Session, channel_id: str, metric: str, horizon_days: int,
@@ -287,24 +309,40 @@ def _current_actual(db: Session, metric: str, channel_id: str) -> float | None:
 
 
 def risk_scan(db: Session, channel: Channel, lc: ChannelLifecycle | None) -> list[dict[str, Any]]:
+    """Portfolio-level risk scan (audit #2, #3, #4, #5).
+
+    Uses the structured risks already computed by the lifecycle engine (with
+    category/risk_score/severity/confidence/evidence/sample_size). A similar
+    title NEVER maps to CRITICAL here; CRITICAL is inherited only from a
+    genuinely CRITICAL risk, otherwise capped at HIGH.
+    """
     out: list[dict[str, Any]] = []
     if lc:
-        risk = (lc.data or {}).get("risk", {})
-        if risk.get("level") == "HIGH":
-            out.append({"category": "Content Risk", "severity": "CRITICAL",
-                        "title": "Judul duplikat/mirip", "evidence": risk.get("reason", "")})
-        elif risk.get("level") == "MEDIUM":
-            out.append({"category": "Content Risk", "severity": "MEDIUM",
-                        "title": "Judul mirip", "evidence": risk.get("reason", "")})
+        risks = (lc.data or {}).get("risks") or []
+        for r in risks:
+            sev = r.get("severity") or "LOW"
+            if sev in ("CRITICAL", "HIGH", "MEDIUM"):
+                out.append({
+                    "category": (r.get("category_label") or r.get("category") or "Content Risk"),
+                    "severity": sev,
+                    "title": r.get("reason", "")[:80],
+                    "evidence": r.get("evidence", ""),
+                    "risk_score": r.get("risk_score"),
+                    "confidence": r.get("confidence", "INSUFFICIENT_DATA"),
+                    "sample_size": r.get("sample_size", 0),
+                    "recommended_action": r.get("recommended_action", ""),
+                })
         if lc.mode == "RECOVERY":
-            out.append({"category": "Growth Risk", "severity": "HIGH",
+            out.append({"category": "Performa", "severity": "HIGH",
                         "title": "Performa menurun",
-                        "evidence": f"Growth {lc.growth_pct}% (28 hari)."})
+                        "evidence": f"Growth {lc.growth_pct}% (28 hari).",
+                        "confidence": "MEDIUM", "sample_size": 2})
     v = baseline(db, channel.id, "views", 28)
     if v.get("status") == "OK" and v["trend"] == "declining":
-        out.append({"category": "Views Risk", "severity": "MEDIUM",
+        out.append({"category": "Tren views", "severity": "MEDIUM",
                     "title": "Tren views menurun",
-                    "evidence": f"Perubahan {v['change_pct']}% (28 hari)."})
+                    "evidence": f"Perubahan {v['change_pct']}% (28 hari).",
+                    "confidence": level_from_score(_confidence(v.get("sample_size", 0), 0.3, 0.5))})
     # upload consistency risk (from cadence profile)
     from app.models.channel_profile import ChannelProfile
 
@@ -316,9 +354,10 @@ def risk_scan(db: Session, channel: Channel, lc: ChannelLifecycle | None) -> lis
         if last and last[0]:
             days_since = (datetime.now(timezone.utc) - last[0]).days
             if days_since > profile.upload_cadence_days * 2:
-                out.append({"category": "Upload Risk", "severity": "LOW",
+                out.append({"category": "Jadwal upload", "severity": "MEDIUM",
                             "title": "Keteraturan upload menurun",
-                            "evidence": f"{days_since} hari sejak video terakhir (target setiap {profile.upload_cadence_days} hari)."})
+                            "evidence": f"{days_since} hari sejak video terakhir (target setiap {profile.upload_cadence_days} hari).",
+                            "confidence": "MEDIUM", "sample_size": 1})
     return out
 
 
@@ -326,16 +365,48 @@ def risk_scan(db: Session, channel: Channel, lc: ChannelLifecycle | None) -> lis
 
 
 def opportunity_scan(db: Session, channel: Channel, lc: ChannelLifecycle | None) -> list[dict[str, Any]]:
+    """Opportunities ranked by evidence (audit #7, #21).
+
+    A single viral video (OUTLIER) is NOT an opportunity - it is data noise for
+    strategy. Only PROVEN / PROMISING patterns become 'Winning Formula' with an
+    experiment status, and every opportunity carries a confidence.
+    """
     out: list[dict[str, Any]] = []
     if lc:
         winners = (lc.data or {}).get("winners", [])
         for w in winners:
-            if w.get("category") in ("VIEW WINNER", "EMERGING WINNER"):
-                score = 80 if w["category"] == "VIEW WINNER" else 65
-                out.append({"category": "Winning Formula", "severity": "HIGH" if score >= 75 else "MEDIUM",
-                            "title": w.get("title", ""), "score": score,
-                            "evidence": f"{w.get('note', '')} views {w.get('data', {}).get('views')}",
-                            "action": "Buat kelanjutan/variasi formula ini."})
+            category = w.get("category")
+            status = w.get("pattern_status")
+            if category == "VIEW WINNER" and status == "PROVEN":
+                score = 82
+                exp = "PROVEN"
+                conf = "HIGH"
+                action = "Perbanyak variasi formula yang sudah terbukti ini."
+            elif category == "VIEW WINNER" and status == "PROMISING":
+                score = 68
+                exp = "PROMISING"
+                conf = "MEDIUM"
+                action = "Uji sekali lagi dengan variasi baru untuk konfirmasi pola."
+            elif category == "EMERGING WINNER" and status == "PROMISING":
+                score = 62
+                exp = "PROMISING"
+                conf = "MEDIUM"
+                action = "Amati video ini; jika pola berulang, jadikan eksperimen."
+            else:
+                # OUTLIER / INCONCLUSIVE / UNDERPERFORMER are not opportunities
+                continue
+            baseline = w.get("baseline") or {}
+            out.append({
+                "category": "Winning Formula",
+                "severity": "HIGH" if score >= 75 else "MEDIUM",
+                "title": w.get("title", ""),
+                "score": score,
+                "experiment_status": exp,
+                "confidence": conf,
+                "sample_size": baseline.get("sample_size", 0),
+                "evidence": f"{w.get('note', '')} (vs median {baseline.get('median', '?')})",
+                "action": action,
+            })
     return out
 
 
@@ -407,6 +478,28 @@ def optimize(db: Session, channel_ids: list[str], constraints: dict[str, Any]) -
 # ---- snapshot / cache ---------------------------------------------------------
 
 
+def risk_scan_all(db: Session, channel_ids: list[str]) -> list[dict[str, Any]]:
+    """Aggregate risk_scan across channels (no snapshot cache needed)."""
+    lc_map = {r.channel_id: r for r in db.query(ChannelLifecycle).filter(ChannelLifecycle.channel_id.in_(channel_ids))}
+    out: list[dict[str, Any]] = []
+    for cid in channel_ids:
+        ch = db.get(Channel, cid)
+        if ch:
+            out += risk_scan(db, ch, lc_map.get(cid))
+    return out
+
+
+def opportunity_scan_all(db: Session, channel_ids: list[str]) -> list[dict[str, Any]]:
+    """Aggregate opportunity_scan across channels (no snapshot cache needed)."""
+    lc_map = {r.channel_id: r for r in db.query(ChannelLifecycle).filter(ChannelLifecycle.channel_id.in_(channel_ids))}
+    out: list[dict[str, Any]] = []
+    for cid in channel_ids:
+        ch = db.get(Channel, cid)
+        if ch:
+            out += opportunity_scan(db, ch, lc_map.get(cid))
+    return out
+
+
 def compute_snapshot(db: Session) -> dict[str, Any]:
     """Build the daily BI snapshot (scheduler job). Cached; dashboards read cache."""
     from app.services.lifecycle_service import MODE_LABELS
@@ -440,15 +533,62 @@ def compute_snapshot(db: Session) -> dict[str, Any]:
             "opportunities": opps,
         })
     allocation = optimize(db, [c.id for c in channels], {"max_videos_per_day": 4})
+    ps = portfolio_score(db, channels, lcs, all_risks, all_opps)
     snapshot = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "per_channel": per_channel,
         "risks": all_risks,
         "opportunities": all_opps,
         "allocation": allocation,
+        "portfolio_score": ps,
     }
     _cache_snapshot(db, snapshot)
     return snapshot
+
+
+_SEV_PENALTY = {"CRITICAL": 40, "HIGH": 25, "MEDIUM": 12, "LOW": 4}
+
+
+def portfolio_score(
+    db: Session, channels: list[Channel], lcs: dict[str, ChannelLifecycle],
+    risks: list[dict[str, Any]], opps: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Portfolio score with an explicit breakdown (audit #23):
+    HEALTH / GROWTH / RISK / OPPORTUNITY / EXPERIMENTATION, each 0-100.
+
+    Internal heuristic - explicitly NOT an official YouTube metric. Displayed
+    with a tooltip so users understand what it means.
+    """
+    from app.models.content_factory import ContentExperiment
+    from app.services.lifecycle_service import MODE_LABELS
+
+    healths = [lc.health_score for lc in lcs.values() if lc.health_score is not None]
+    growths = [lc.growth_pct for lc in lcs.values() if lc.growth_pct is not None]
+    health = round(_mean(healths), 1) if healths else None
+    growth = round(_mean(growths), 1) if growths else None
+
+    risk = round(max(0.0, 100 - sum(_SEV_PENALTY.get(r.get("severity"), 0) for r in risks)), 1) if risks else None
+    opp_scores = [o.get("score") or 0 for o in opps]
+    opportunity = round(min(100.0, 25 + len(opps) * 8 + (_mean(opp_scores) * 0.35 if opp_scores else 0)), 1) if opps else None
+
+    exp_count = db.query(ContentExperiment).count()
+    proven = sum(1 for o in opps if o.get("experiment_status") == "PROVEN")
+    experimentation = round(min(100.0, 20 + exp_count * 12 + proven * 10), 1)
+
+    parts = [v for v in (health, growth, risk, opportunity, experimentation) if v is not None]
+    total = round(_mean(parts), 1) if parts else None
+    return {
+        "total": total,
+        "breakdown": {
+            "HEALTH": health,
+            "GROWTH": growth,
+            "RISK": risk,
+            "OPPORTUNITY": opportunity,
+            "EXPERIMENTATION": experimentation,
+        },
+        "note": "Skor internal (heuristik), bukan metrik resmi YouTube.",
+        "channel_modes": {cid: MODE_LABELS.get(lc.mode, lc.mode) for cid, lc in lcs.items()},
+    }
 
 
 def _cache_snapshot(db: Session, snapshot: dict) -> None:
