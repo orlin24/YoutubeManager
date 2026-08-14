@@ -60,6 +60,7 @@ export default function LearningPage() {
   const [loading, setLoading] = useState(true);
   const [evaluating, setEvaluating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -81,8 +82,16 @@ export default function LearningPage() {
   const onEvaluate = async () => {
     setEvaluating(true);
     setError(null);
+    setInfo(null);
     try {
-      await evaluateLearning();
+      const res = await evaluateLearning();
+      const total = (res?.evaluated ?? 0) + (res?.pending_left ?? 0);
+      setInfo(
+        total === 0
+          ? "Tidak ada rekomendasi baru untuk dievaluasi. Rekomendasi perlu waktu ±7 hari setelah dibuat agar hasilnya bisa dibandingkan."
+          : `Evaluasi selesai: ${res?.evaluated ?? 0} diproses, ${res?.updated ?? 0} keyakinan diperbarui.`
+      );
+      window.setTimeout(() => setInfo(null), 8000);
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Evaluasi gagal.");
@@ -110,6 +119,11 @@ export default function LearningPage() {
       </div>
 
       {error && <ErrorAlert message={error} onRetry={load} />}
+      {info && (
+        <div className="flex items-start gap-2 rounded-lg border border-emerald-800 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-300">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> {info}
+        </div>
+      )}
 
       {loading && !stats ? (
         <div className="flex justify-center py-16 text-brand-400">
