@@ -659,7 +659,8 @@ def sync_channel_data(db: Session, account: YouTubeAccount, *, full: bool = True
     }
 
 
-def _upsert_channel_snapshot(db: Session, channel: Channel, metrics: dict | None = None) -> None:
+def _upsert_channel_snapshot(db: Session, channel: Channel, metrics: dict | None = None,
+                             day: date | None = None) -> None:
     """Store a daily channel-level analytics snapshot (DAILY DELTAS).
 
     metrics comes from the YouTube Analytics API for the most recent FINALIZED
