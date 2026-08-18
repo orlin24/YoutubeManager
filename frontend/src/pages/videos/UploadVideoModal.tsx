@@ -448,7 +448,7 @@ export default function UploadVideoModal({ open, onClose, onUploaded }: Props) {
                 type="button"
                 onClick={() => setSchedule(false)}
                 className={`rounded-md px-4 py-1.5 text-xs font-medium transition-colors ${
-                  !schedule ? "bg-brand-600 text-white" : "text-zinc-400 hover:text-zinc-200"
+                  !schedule ? "bg-brand-600 text-brand-950" : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
                 Publikasikan sekarang
@@ -457,7 +457,7 @@ export default function UploadVideoModal({ open, onClose, onUploaded }: Props) {
                 type="button"
                 onClick={() => setSchedule(true)}
                 className={`rounded-md px-4 py-1.5 text-xs font-medium transition-colors ${
-                  schedule ? "bg-brand-600 text-white" : "text-zinc-400 hover:text-zinc-200"
+                  schedule ? "bg-brand-600 text-brand-950" : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
                 Terjadwal

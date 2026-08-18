@@ -91,7 +91,7 @@ export function AppLayout() {
   const sidebar = (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-white">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-700 text-brand-100">
           <Bot className="h-5 w-5" />
         </div>
         <div>
@@ -107,10 +107,10 @@ export function AppLayout() {
             to={to}
             end={to === "/"}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              `flex items-center gap-3 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                 isActive
-                  ? "bg-brand-600/15 text-brand-300"
-                  : "text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-200"
+                  ? "bg-brand-700 text-brand-100"
+                  : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
               }`
             }
           >

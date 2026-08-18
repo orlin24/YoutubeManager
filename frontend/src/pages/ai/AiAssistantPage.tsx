@@ -176,7 +176,7 @@ export default function AiAssistantPage() {
             <div key={i} className="flex justify-start">
               <div className="max-w-[85%] space-y-2">
                 <div className="flex items-start gap-2">
-                  <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white">
+                  <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-brand-950">
                     <Bot className="h-3.5 w-3.5" />
                   </div>
                   <div

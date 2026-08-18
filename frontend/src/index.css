@@ -2,12 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Material 3 (dark) base - surfaces/outlines dari palet M3 */
 @layer base {
   html {
     @apply bg-zinc-950 text-zinc-100;
   }
   body {
-    @apply bg-zinc-950 text-zinc-100;
+    @apply bg-zinc-950 text-zinc-100 antialiased;
+  }
+  ::selection {
+    @apply bg-brand-700/60 text-brand-100;
   }
   ::-webkit-scrollbar {
     width: 8px;
@@ -25,25 +29,28 @@
 }
 
 @layer components {
+  /* M3 elevated card: tonal surface + soft elevation, tanpa border keras */
   .card {
-    @apply bg-zinc-900/70 border border-zinc-800 rounded-xl p-5;
+    @apply bg-zinc-900 rounded-2xl p-5 shadow-m3-1 ring-1 ring-white/5;
   }
+  /* M3 outlined text field */
   .input {
-    @apply w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500;
+    @apply w-full rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-400 transition-shadow;
   }
+  /* M3 buttons: state layers + subtle press */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97];
   }
   .btn-primary {
-    @apply btn bg-brand-600 hover:bg-brand-500 text-white;
+    @apply btn bg-brand-600 text-brand-950 shadow-m3-1 hover:brightness-110;
   }
   .btn-secondary {
-    @apply btn bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700;
+    @apply btn bg-zinc-800 text-zinc-100 ring-1 ring-zinc-600 hover:bg-zinc-700;
   }
   .btn-danger {
-    @apply btn bg-red-600/90 hover:bg-red-500 text-white;
+    @apply btn bg-m3error text-m3error-on hover:brightness-110;
   }
   .btn-ghost {
-    @apply btn bg-transparent hover:bg-zinc-800 text-zinc-300;
+    @apply btn bg-transparent text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100;
   }
 }

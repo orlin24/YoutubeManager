@@ -89,18 +89,18 @@ export default function AnalyticsPage() {
           <AreaChart data={data.timeseries}>
             <defs>
               <linearGradient id="aviews" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                <stop offset="5%" stopColor="#D0BCFF" stopOpacity={0.4} />
+                <stop offset="95%" stopColor="#D0BCFF" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-            <XAxis dataKey="date" stroke="#52525b" fontSize={11} />
-            <YAxis stroke="#52525b" fontSize={11} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#2B2930" />
+            <XAxis dataKey="date" stroke="#49454F" fontSize={11} />
+            <YAxis stroke="#49454F" fontSize={11} />
             <Tooltip
-              contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }}
-              labelStyle={{ color: "#e4e4e7" }}
+              contentStyle={{ background: "#211F26", border: "1px solid #49454F", borderRadius: 8 }}
+              labelStyle={{ color: "#E6E0E9" }}
             />
-            <Area type="monotone" dataKey="views" stroke="#6366f1" fill="url(#aviews)" />
+            <Area type="monotone" dataKey="views" stroke="#D0BCFF" fill="url(#aviews)" />
           </AreaChart>
         </ResponsiveContainer>
       </Card>

@@ -68,22 +68,22 @@ export default function RealtimeChart({ channelId }: RealtimeChartProps) {
           <div className="h-32">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#2B2930" vertical={false} />
                 <XAxis
                   dataKey="date"
-                  stroke="#52525b"
+                  stroke="#49454F"
                   fontSize={10}
                   tickFormatter={(d: string) => new Date(d).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
                 />
-                <YAxis stroke="#52525b" fontSize={10} />
+                <YAxis stroke="#49454F" fontSize={10} />
                 <Tooltip
-                  cursor={{ fill: "#27272a55" }}
-                  contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }}
-                  labelStyle={{ color: "#e4e4e7" }}
+                  cursor={{ fill: "#2B293055" }}
+                  contentStyle={{ background: "#211F26", border: "1px solid #49454F", borderRadius: 8 }}
+                  labelStyle={{ color: "#E6E0E9" }}
                   formatter={(value) => [`${Number(value).toLocaleString()}`, "penayangan"]}
                   labelFormatter={(d) => new Date(String(d)).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}
                 />
-                <Bar dataKey="views" fill="#6366f1" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="views" fill="#D0BCFF" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
