@@ -216,15 +216,21 @@ export default function LearningPage() {
                   </thead>
                   <tbody>
                     {outcomes.slice(0, 20).map((o) => (
-                      <tr key={o.id} className="border-b border-zinc-800/60">
-                        <td className="max-w-[260px] py-2.5 pr-3">
-                          <p className="truncate text-zinc-200">{o.decision}</p>
-                          <p className="truncate text-[11px] text-zinc-600">{o.expected_outcome}</p>
+                      <tr key={o.id} className="border-b border-zinc-800/60 align-top">
+                        <td className="min-w-[320px] py-2.5 pr-3">
+                          <p className="break-words text-sm leading-snug text-zinc-200">{o.decision}</p>
                         </td>
-                        <td className="px-3 py-2.5 text-zinc-300">{o.confidence}</td>
-                        <td className="px-3 py-2.5 text-zinc-300">{o.expected_value != null ? o.expected_value.toLocaleString() : "-"}</td>
-                        <td className="px-3 py-2.5 text-zinc-300">{o.actual_value != null ? o.actual_value.toLocaleString() : "-"}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-zinc-300">{o.confidence}</td>
                         <td className="px-3 py-2.5">
+                          <p className="font-medium text-zinc-200">
+                            {o.expected_value != null ? o.expected_value.toLocaleString() : "-"}
+                          </p>
+                          <p className="break-words text-[11px] leading-snug text-zinc-600">{o.expected_outcome}</p>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-zinc-300">
+                          {o.actual_value != null ? o.actual_value.toLocaleString() : "-"}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5">
                           {o.status === "evaluated" ? (
                             <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
                               <CheckCircle2 className="h-3.5 w-3.5" /> Terverifikasi
