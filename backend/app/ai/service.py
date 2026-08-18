@@ -574,7 +574,7 @@ def generate_content_patterns(db: Session, channel: Channel, days: int = 28) -> 
             expected_value = median_views * 2.0
             record_recommendation(
                 db, channel.id,
-                decision=f"Uji pola judul: {saved[0]['title'][:80]}",
+                decision=f"Uji pola judul: {saved[0]['title']}",
                 reason=analysis[:300],
                 evidence=f"Status pola {pattern_status}; median channel {median_views:.0f} views; {top_count} video teratas berbagi pola judul.",
                 sample_size=total_videos,

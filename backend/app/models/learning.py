@@ -27,7 +27,7 @@ class RecommendationOutcome(Base):
 
     id: Mapped[str] = uuid_pk()
     channel_id: Mapped[str] = mapped_column(ForeignKey("channels.id"), index=True, nullable=False)
-    decision: Mapped[str] = mapped_column(String(200), nullable=False)          # e.g. "Uji format X"
+    decision: Mapped[str] = mapped_column(Text, nullable=False)                 # e.g. "Uji format X"
     reason: Mapped[str] = mapped_column(Text, default="")
     evidence: Mapped[str] = mapped_column(Text, default="")
     sample_size: Mapped[int] = mapped_column(Integer, default=0)

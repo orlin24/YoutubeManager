@@ -56,7 +56,7 @@ def record_recommendation(
     """Persist a recommendation so expected vs actual can be compared later."""
     row = RecommendationOutcome(
         channel_id=channel_id,
-        decision=decision[:200],
+        decision=decision[:600],
         reason=reason,
         evidence=evidence,
         sample_size=sample_size,
